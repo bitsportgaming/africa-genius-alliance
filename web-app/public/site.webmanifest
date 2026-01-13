@@ -1,0 +1,27 @@
+{
+  "name": "Africa Genius Alliance",
+  "short_name": "AGA",
+  "description": "Leadership Earned by Merit. Not Politics.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a4d3c",
+  "theme_color": "#0a4d3c",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/Aga.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/Aga.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["social", "education", "business"],
+  "lang": "en",
+  "dir": "ltr"
+}

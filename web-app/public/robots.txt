@@ -1,0 +1,17 @@
+# robots.txt for Africa Genius Alliance
+User-agent: *
+Allow: /
+Allow: /auth/login
+Allow: /auth/signup
+Allow: /explore
+
+# Disallow private pages
+Disallow: /dashboard
+Disallow: /profile
+Disallow: /create
+Disallow: /vote
+Disallow: /impact
+Disallow: /api/
+
+# Sitemap
+Sitemap: https://africageniusalliance.com/sitemap.xml

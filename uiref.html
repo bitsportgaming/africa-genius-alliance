@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Africa Genius Alliance – UI Kit</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+
+    <!-- Global App Header -->
+    <header class="app-header">
+      <div class="app-logo-circle">AGA</div>
+      <div class="app-header-text">
+        <h1>Africa Genius Alliance</h1>
+        <p class="app-subtitle">Meritocracy • Leadership • Africa First</p>
+      </div>
+    </header>
+
+    <!-- Simple tab bar to switch mock screens (for dev preview only) -->
+    <nav class="screen-tabs">
+      <button data-target="screen-onboarding" class="active">Onboarding</button>
+      <button data-target="screen-supporter-dashboard">Supporter</button>
+      <button data-target="screen-genius-profile">Genius</button>
+      <button data-target="screen-voting">Voting</button>
+      <button data-target="screen-funding">Funding</button>
+      <button data-target="screen-leaderboard">Leaderboard</button>
+      <button data-target="screen-aga-profile">AGA Profile</button>
+      <button data-target="screen-constitution">Constitution</button>
+      <button data-target="screen-dao">DAO</button>
+      <button data-target="screen-train-rareearth">Trains & Rare Earth</button>
+    </nav>
+
+    <!-- SCREENS WRAPPER -->
+    <main class="screens-wrapper">
+
+      <!-- 1. ONBOARDING SCREEN -->
+      <section class="screen active" id="screen-onboarding">
+        <div class="hero-card">
+          <p class="eyebrow">Welcome to</p>
+          <h2>AFRICA GENIUS ALLIANCE</h2>
+          <p class="hero-text">
+            A Pan-African meritocratic political party and digital platform that discovers, ranks and funds
+            Africa’s brightest leaders across 54 countries.
+          </p>
+        </div>
+
+        <div class="africa-badge">
+          <div class="africa-map"></div>
+          <div>
+            <p class="africa-label">Made for Africa</p>
+            <p class="africa-sub">Pan-African • Digital • Sovereign</p>
+          </div>
+        </div>
+
+        <div class="choice-card">
+          <p class="choice-label">Choose your path</p>
+          <button class="btn btn-primary full">I am a Genius</button>
+          <button class="btn btn-ghost full">I am a Supporter</button>
+        </div>
+
+        <div class="info-row">
+          <div class="pill pill-primary">Meritocracy</div>
+          <div class="pill">Blockchain</div>
+          <div class="pill">Youth Power</div>
+        </div>
+      </section>
+
+      <!-- 2. SUPPORTER DASHBOARD -->
+      <section class="screen" id="screen-supporter-dashboard">
+        <h2 class="screen-title">Supporter Dashboard</h2>
+
+        <div class="filter-row">
+          <button class="chip chip-filled">All</button>
+          <button class="chip">My Country</button>
+          <button class="chip">Youth</button>
+          <button class="chip">Parliament</button>
+          <button class="chip">Tech</button>
+        </div>
+
+        <div class="card-list">
+          <article class="genius-card">
+            <div class="genius-avatar">NK</div>
+            <div class="genius-main">
+              <h3>Nkosi Dlamini</h3>
+              <p class="genius-role">Candidate • Minister of Digital Economy</p>
+              <p class="genius-country">South Africa • Age 32</p>
+              <p class="genius-blurb">
+                Bringing AI, solar and fiber to rural communities while creating 1M digital jobs.
+              </p>
+              <div class="genius-meta">
+                <span>Votes: <strong>24,580</strong></span>
+                <span>Supporters: <strong>8,113</strong></span>
+              </div>
+            </div>
+            <div class="genius-actions">
+              <button class="btn btn-outline">View</button>
+              <button class="icon-btn">★</button>
+            </div>
+          </article>
+
+          <article class="genius-card">
+            <div class="genius-avatar">AM</div>
+            <div class="genius-main">
+              <h3>Amina Mensah</h3>
+              <p class="genius-role">Candidate • Minister of Education</p>
+              <p class="genius-country">Ghana • Age 28</p>
+              <p class="genius-blurb">
+                Rewriting the curriculum to match the future, not the past — tech, trade and African history.
+              </p>
+              <div class="genius-meta">
+                <span>Votes: <strong>31,442</strong></span>
+                <span>Supporters: <strong>12,007</strong></span>
+              </div>
+            </div>
+            <div class="genius-actions">
+              <button class="btn btn-outline">View</button>
+              <button class="icon-btn">★</button>
+            </div>
+          </article>
+        </div>
+
+        <div class="bottom-hint">
+          Tap any profile to see their vision, funding progress and on-chain credibility.
+        </div>
+      </section>
+
+      <!-- 3. GENIUS PROFILE -->
+      <section class="screen" id="screen-genius-profile">
+        <h2 class="screen-title">Genius Profile</h2>
+
+        <div class="profile-header">
+          <div class="profile-avatar-large">AM</div>
+          <div class="profile-main">
+            <h3>Amina Mensah</h3>
+            <p class="profile-role">Minister of Education Candidate</p>
+            <p class="profile-country">Ghana • Africa Genius Alliance</p>
+            <div class="profile-tags">
+              <span class="pill pill-primary">Education Reform</span>
+              <span class="pill">Girls in STEM</span>
+              <span class="pill">Digital Literacy</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="profile-stat-row">
+          <div>
+            <p class="stat-label">Votes</p>
+            <p class="stat-value">31,442</p>
+          </div>
+          <div>
+            <p class="stat-label">Supporters</p>
+            <p class="stat-value">12,007</p>
+          </div>
+          <div>
+            <p class="stat-label">Funding</p>
+            <p class="stat-value">$84,210</p>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>Vision Statement</h4>
+          <p>
+            “By 2035, every African child should be fluent in technology, trade, and African history —
+            not trapped in colonial curricula that ignore their future.”
+          </p>
+        </div>
+
+        <div class="card">
+          <h4>Key Commitments</h4>
+          <ul class="simple-list">
+            <li>Replace outdated subjects with digital-first skills.</li>
+            <li>Create continent-wide teacher retraining programs.</li>
+            <li>Build public–private innovation hubs near schools.</li>
+          </ul>
+        </div>
+
+        <div class="profile-cta-row">
+          <button class="btn btn-primary full">Support</button>
+          <button class="btn btn-outline full">Fund</button>
+        </div>
+      </section>
+
+      <!-- 4. VOTING SCREEN -->
+      <section class="screen" id="screen-voting">
+        <h2 class="screen-title">Vote for Your Genius</h2>
+
+        <div class="card">
+          <p class="eyebrow">Current Race</p>
+          <h3>Minister of Digital Economy • South Africa</h3>
+          <p>
+            Your vote is recorded on-chain, publicly auditable, and cannot be altered by any government
+            or political actor.
+          </p>
+        </div>
+
+        <div class="card">
+          <div class="candidate-row">
+            <div>
+              <p class="candidate-name">Nkosi Dlamini</p>
+              <p class="candidate-sub">Africa Genius Alliance</p>
+            </div>
+            <span class="candidate-score">56%</span>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill" style="width:56%"></div>
+          </div>
+
+          <div class="candidate-row">
+            <div>
+              <p class="candidate-name">Other Candidate</p>
+              <p class="candidate-sub">Traditional Party</p>
+            </div>
+            <span class="candidate-score alt">44%</span>
+          </div>
+          <div class="progress-bar alt">
+            <div class="progress-fill alt" style="width:44%"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <p class="eyebrow">Your Voting Power</p>
+          <p>You have <strong>4</strong> merit-based votes available in this race.</p>
+          <div class="vote-controls">
+            <button class="btn btn-outline">−</button>
+            <span class="vote-count">1</span>
+            <button class="btn btn-outline">+</button>
+          </div>
+          <button class="btn btn-primary full">Cast Vote On-Chain</button>
+          <p class="legal-note">
+            By voting, you agree that all results are public, transparent and protected from political interference.
+          </p>
+        </div>
+      </section>
+
+      <!-- 5. FUNDING SCREEN -->
+      <section class="screen" id="screen-funding">
+        <h2 class="screen-title">Fund This Genius</h2>
+
+        <div class="card">
+          <p class="eyebrow">Funding Campaign</p>
+          <h3>Amina Mensah • Education Reform 2035</h3>
+          <div class="progress-bar">
+            <div class="progress-fill" style="width:62%"></div>
+          </div>
+          <p class="funding-meta">
+            <strong>$84,210</strong> raised of $135,000 goal • <span>62% funded</span>
+          </p>
+        </div>
+
+        <div class="card">
+          <h4>Milestone Breakdown</h4>
+          <ul class="simple-list">
+            <li><strong>25%</strong> – Community townhalls & school tours</li>
+            <li><strong>35%</strong> – Research, curriculum redesign teams</li>
+            <li><strong>20%</strong> – Digital content, teacher training</li>
+            <li><strong>20%</strong> – Compliance, legal, audit & reporting</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h4>Choose Your Contribution</h4>
+          <div class="amount-row">
+            <button class="chip chip-filled">$25</button>
+            <button class="chip">$50</button>
+            <button class="chip">$100</button>
+            <button class="chip">$250</button>
+          </div>
+          <input class="input" type="number" placeholder="Or enter custom amount" />
+          <select class="input">
+            <option>Currency: USDT</option>
+            <option>Currency: USD</option>
+            <option>Currency: EUR</option>
+          </select>
+          <button class="btn btn-primary full">Continue to On-Chain Payment</button>
+          <p class="legal-note">
+            Funds are held in a smart contract and released only when milestones are verified.
+          </p>
+        </div>
+      </section>
+
+      <!-- 6. LEADERBOARD -->
+      <section class="screen" id="screen-leaderboard">
+        <h2 class="screen-title">Continental Leaderboard</h2>
+
+        <div class="filter-row">
+          <button class="chip chip-filled">Top 100</button>
+          <button class="chip">By Country</button>
+          <button class="chip">By Position</button>
+          <button class="chip">Rising Stars</button>
+        </div>
+
+        <ol class="leaderboard-list">
+          <li>
+            <span class="rank">1</span>
+            <div class="leader-info">
+              <p class="leader-name">Amina Mensah</p>
+              <p class="leader-meta">Ghana • Education • 31,442 votes</p>
+            </div>
+            <span class="leader-score">AAA</span>
+          </li>
+          <li>
+            <span class="rank">2</span>
+            <div class="leader-info">
+              <p class="leader-name">Nkosi Dlamini</p>
+              <p class="leader-meta">South Africa • Digital Economy • 24,580 votes</p>
+            </div>
+            <span class="leader-score">AA+</span>
+          </li>
+          <li>
+            <span class="rank">3</span>
+            <div class="leader-info">
+              <p class="leader-name">Leila Ben Ali</p>
+              <p class="leader-meta">Morocco • Transport • 19,340 votes</p>
+            </div>
+            <span class="leader-score">AA</span>
+          </li>
+        </ol>
+
+        <div class="bottom-hint">
+          Rankings are computed on-chain using votes, support, reputation and verified impact.
+        </div>
+      </section>
+
+      <!-- 7. AGA OFFICIAL PROFILE -->
+      <section class="screen" id="screen-aga-profile">
+        <h2 class="screen-title">AGA Official Profile</h2>
+
+        <div class="card card-aga-header">
+          <div class="aga-logo-circle"></div>
+          <div>
+            <h3>Africa Genius Alliance (AGA)</h3>
+            <p class="aga-meta">Meritocratic Political Party • Pan-African</p>
+            <p class="aga-meta">Verified • International Registration</p>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>Our Mission</h4>
+          <p>
+            To identify, elevate and protect Africa’s most capable leaders using transparent digital tools, 
+            and to transform our continent through meritocracy, rare-earth sovereignty and connected infrastructure.
+          </p>
+        </div>
+
+        <div class="card">
+          <h4>Core Pillars</h4>
+          <ul class="simple-list">
+            <li>Meritocracy over patronage and tribal politics.</li>
+            <li>Digital transparency powered by blockchain.</li>
+            <li>Economic sovereignty through value-for-value rare-earth deals.</li>
+            <li>Continental integration via a Pan-African train network.</li>
+          </ul>
+        </div>
+
+        <div class="profile-cta-row">
+          <button class="btn btn-primary full">Read Constitution</button>
+          <button class="btn btn-outline full">View AGA Projects</button>
+        </div>
+      </section>
+
+      <!-- 8. CONSTITUTION / DOCUMENTS SCREEN -->
+      <section class="screen" id="screen-constitution">
+        <h2 class="screen-title">AGA Constitution</h2>
+
+        <div class="card">
+          <h4>Preamble</h4>
+          <p>
+            We, the Africa Genius Alliance, establish this meritocratic political party to restore dignity, capacity
+            and transparency to African governance in all 54 states and among the diaspora.
+          </p>
+        </div>
+
+        <div class="card">
+          <h4>Table of Contents</h4>
+          <ul class="simple-list">
+            <li>Chapter 1 – Principles & Values</li>
+            <li>Chapter 2 – Party Structure & Leadership</li>
+            <li>Chapter 3 – Digital Governance & Blockchain</li>
+            <li>Chapter 4 – Economic & Rare-Earth Policy</li>
+            <li>Chapter 5 – Security, Defence & Non-Interference</li>
+            <li>Chapter 6 – Amendments & Reforms</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h4>Highlight: Non-Interference Clause</h4>
+          <p>
+            No government, politician or agency shall unlawfully interfere with, suppress or attempt to 
+            shut down the AGA platform, which is protected under international democratic and digital rights.
+          </p>
+        </div>
+      </section>
+
+      <!-- 9. DAO / TREASURY DASHBOARD -->
+      <section class="screen" id="screen-dao">
+        <h2 class="screen-title">DAO & Treasury</h2>
+
+        <div class="card">
+          <h4>Current Treasury</h4>
+          <p class="treasury-amount">$5,420,000</p>
+          <p class="treasury-sub">Multi-sig, on-chain, internationally audited</p>
+          <div class="treasury-split">
+            <div>
+              <p class="stat-label">Genius Funding</p>
+              <p class="stat-value">45%</p>
+            </div>
+            <div>
+              <p class="stat-label">Infrastructure</p>
+              <p class="stat-value">30%</p>
+            </div>
+            <div>
+              <p class="stat-label">Operations</p>
+              <p class="stat-value">15%</p>
+            </div>
+            <div>
+              <p class="stat-label">Reserves</p>
+              <p class="stat-value">10%</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>Active Proposals</h4>
+          <div class="proposal-row">
+            <div>
+              <p class="proposal-title">Expand Pan-African Train Feasibility Study</p>
+              <p class="proposal-meta">Closes in 3 days • Quorum: 68%</p>
+            </div>
+            <div class="proposal-progress">
+              <div class="progress-bar tiny">
+                <div class="progress-fill" style="width:68%"></div>
+              </div>
+              <p class="proposal-votes">Yes 68% • No 32%</p>
+            </div>
+          </div>
+
+          <div class="proposal-row">
+            <div>
+              <p class="proposal-title">Fund 200 Youth Genius Fellowships</p>
+              <p class="proposal-meta">Closes in 7 days • Quorum: 41%</p>
+            </div>
+            <div class="proposal-progress">
+              <div class="progress-bar tiny alt">
+                <div class="progress-fill alt" style="width:41%"></div>
+              </div>
+              <p class="proposal-votes">Yes 41% • No 59%</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="profile-cta-row">
+          <button class="btn btn-primary full">View All Proposals</button>
+          <button class="btn btn-outline full">Submit New Proposal</button>
+        </div>
+      </section>
+
+      <!-- 10. TRAINS & RARE EARTH STRATEGY -->
+      <section class="screen" id="screen-train-rareearth">
+        <h2 class="screen-title">Trains & Rare-Earth Strategy</h2>
+
+        <div class="card">
+          <h4>Value-for-Value Doctrine</h4>
+          <p>
+            AGA rejects selling Africa’s rare earth minerals for weak fiat. Instead, we trade directly for
+            hard infrastructure: rail, power, refineries, ports and digital networks.
+          </p>
+        </div>
+
+        <div class="card">
+          <h4>Strategic Pillars</h4>
+          <ul class="simple-list">
+            <li>Tokenized infrastructure ownership for citizens.</li>
+            <li>Pan-African high-speed and cargo rail map.</li>
+            <li>Transparent, on-chain contracts for every deal.</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h4>Impact on AGA App</h4>
+          <p>
+            The app becomes the public window into every deal: who benefits, what is built, and how 
+            rail and infrastructure link to geniuses, jobs, and long-term sovereignty.
+          </p>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Tiny JS snippet just to switch between screens in the preview.
+       Your dev can remove this and wire it into a real router. -->
+  <script>
+    const buttons = document.querySelectorAll('.screen-tabs button');
+    const screens = document.querySelectorAll('.screen');
+
+    buttons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        buttons.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+
+        const target = btn.getAttribute('data-target');
+        screens.forEach(s => {
+          s.classList.toggle('active', s.id === target);
+        });
+      });
+    });
+  </script>
+</body>
+</html>

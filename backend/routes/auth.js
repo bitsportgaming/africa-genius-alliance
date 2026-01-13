@@ -92,9 +92,19 @@ router.post('/register', async (req, res) => {
         const userResponse = user.toObject();
         delete userResponse.passwordHash;
 
-        res.status(201).json({ 
-            success: true, 
-            data: userResponse,
+        // Generate JWT token
+        const token = jwt.sign(
+            { userId: user.userId, email: user.email, role: user.role },
+            JWT_SECRET,
+            { expiresIn: '7d' }
+        );
+
+        res.status(201).json({
+            success: true,
+            data: {
+                user: userResponse,
+                token
+            },
             message: 'Registration successful'
         });
     } catch (error) {
@@ -138,9 +148,19 @@ router.post('/login', async (req, res) => {
         const userResponse = user.toObject();
         delete userResponse.passwordHash;
 
-        res.json({ 
-            success: true, 
-            data: userResponse,
+        // Generate JWT token
+        const token = jwt.sign(
+            { userId: user.userId, email: user.email, role: user.role },
+            JWT_SECRET,
+            { expiresIn: '7d' }
+        );
+
+        res.json({
+            success: true,
+            data: {
+                user: userResponse,
+                token
+            },
             message: 'Login successful'
         });
     } catch (error) {

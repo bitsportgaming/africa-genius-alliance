@@ -68,12 +68,25 @@ router.get('/:userId', async (req, res) => {
 router.post('/', async (req, res) => {
     try {
         const { userId, username, displayName, email, profileImageURL, bio, country, role, positionTitle } = req.body;
-        
+
+        // Try to find user by userId first, then by _id
         let user = await User.findOne({ userId });
-        
+        if (!user && userId) {
+            try {
+                user = await User.findById(userId);
+            } catch (e) {
+                // Invalid ObjectId format, ignore
+            }
+        }
+
         if (user) {
             // Update existing user
-            Object.assign(user, { displayName, profileImageURL, bio, country, role, positionTitle });
+            if (displayName !== undefined) user.displayName = displayName;
+            if (profileImageURL !== undefined) user.profileImageURL = profileImageURL;
+            if (bio !== undefined) user.bio = bio;
+            if (country !== undefined) user.country = country;
+            if (role !== undefined) user.role = role;
+            if (positionTitle !== undefined) user.positionTitle = positionTitle;
             await user.save();
         } else {
             // Create new user

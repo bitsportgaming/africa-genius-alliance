@@ -41,18 +41,18 @@ export default function ProfilePage() {
   const isGenius = user?.role === UserRole.GENIUS;
 
   const handleSave = async () => {
-    if (!user?._id) return;
+    if (!user?.userId && !user?._id) return;
 
     setIsSaving(true);
     try {
-      // Call API to update profile
+      // Call API to update profile - use userId if available, fallback to _id
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          userId: user._id,
+          userId: user.userId || user._id,
           displayName: formData.displayName,
           bio: formData.bio,
           country: formData.country,
@@ -80,13 +80,13 @@ export default function ProfilePage() {
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !user?._id) return;
+    if (!file || (!user?.userId && !user?._id)) return;
 
     try {
       // Create form data for file upload
       const formData = new FormData();
       formData.append('image', file);
-      formData.append('userId', user._id);
+      formData.append('userId', user.userId || user._id);
 
       // Upload to server
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/upload/profile-image`, {

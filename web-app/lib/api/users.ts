@@ -8,6 +8,38 @@ export interface GetGeniusesParams {
   page?: number;
 }
 
+// Helper function to get current user ID from localStorage
+function getCurrentUserId(): string | undefined {
+  if (typeof window === 'undefined') return undefined;
+
+  // Try the Zustand auth storage first
+  const authStorage = localStorage.getItem('aga-auth-storage');
+  if (authStorage) {
+    try {
+      const parsed = JSON.parse(authStorage);
+      const user = parsed?.state?.user;
+      if (user) {
+        return user.userId || user._id;
+      }
+    } catch (e) {
+      // Ignore parse errors
+    }
+  }
+
+  // Fallback to legacy storage
+  const userData = localStorage.getItem('aga_user_data');
+  if (userData) {
+    try {
+      const user = JSON.parse(userData);
+      return user.userId || user._id;
+    } catch (e) {
+      // Ignore parse errors
+    }
+  }
+
+  return undefined;
+}
+
 export const usersAPI = {
   async getGeniuses(params?: GetGeniusesParams): Promise<PaginatedResponse<User>> {
     const queryParams = new URLSearchParams();
@@ -26,28 +58,12 @@ export const usersAPI = {
   },
 
   async followUser(userId: string, followerId?: string): Promise<APIResponse<{ following: boolean }>> {
-    // Get follower ID from localStorage if not provided
-    let actualFollowerId = followerId;
-    if (!actualFollowerId && typeof window !== 'undefined') {
-      const userData = localStorage.getItem('aga_user_data');
-      if (userData) {
-        const user = JSON.parse(userData);
-        actualFollowerId = user.userId || user._id;
-      }
-    }
+    const actualFollowerId = followerId || getCurrentUserId();
     return apiClient.post(`/users/${userId}/follow`, { followerId: actualFollowerId });
   },
 
   async unfollowUser(userId: string, followerId?: string): Promise<APIResponse<{ following: boolean }>> {
-    // Get follower ID from localStorage if not provided
-    let actualFollowerId = followerId;
-    if (!actualFollowerId && typeof window !== 'undefined') {
-      const userData = localStorage.getItem('aga_user_data');
-      if (userData) {
-        const user = JSON.parse(userData);
-        actualFollowerId = user.userId || user._id;
-      }
-    }
+    const actualFollowerId = followerId || getCurrentUserId();
     return apiClient.post(`/users/${userId}/follow`, { followerId: actualFollowerId });
   },
 
@@ -64,15 +80,7 @@ export const usersAPI = {
   },
 
   async voteForGenius(userId: string, voterId?: string): Promise<APIResponse<{ votesReceived: number; message: string }>> {
-    // Get voter ID from localStorage if not provided
-    let actualVoterId = voterId;
-    if (!actualVoterId && typeof window !== 'undefined') {
-      const userData = localStorage.getItem('aga_user_data');
-      if (userData) {
-        const user = JSON.parse(userData);
-        actualVoterId = user.userId || user._id;
-      }
-    }
+    const actualVoterId = voterId || getCurrentUserId();
     return apiClient.post(`/users/${userId}/vote`, { voterId: actualVoterId });
   },
 };

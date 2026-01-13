@@ -25,12 +25,30 @@ export const usersAPI = {
     return apiClient.get(`/users/${userId}`);
   },
 
-  async followUser(userId: string): Promise<APIResponse<{ following: boolean }>> {
-    return apiClient.post(`/users/${userId}/follow`);
+  async followUser(userId: string, followerId?: string): Promise<APIResponse<{ following: boolean }>> {
+    // Get follower ID from localStorage if not provided
+    let actualFollowerId = followerId;
+    if (!actualFollowerId && typeof window !== 'undefined') {
+      const userData = localStorage.getItem('aga_user_data');
+      if (userData) {
+        const user = JSON.parse(userData);
+        actualFollowerId = user.userId || user._id;
+      }
+    }
+    return apiClient.post(`/users/${userId}/follow`, { followerId: actualFollowerId });
   },
 
-  async unfollowUser(userId: string): Promise<APIResponse<{ following: boolean }>> {
-    return apiClient.post(`/users/${userId}/unfollow`);
+  async unfollowUser(userId: string, followerId?: string): Promise<APIResponse<{ following: boolean }>> {
+    // Get follower ID from localStorage if not provided
+    let actualFollowerId = followerId;
+    if (!actualFollowerId && typeof window !== 'undefined') {
+      const userData = localStorage.getItem('aga_user_data');
+      if (userData) {
+        const user = JSON.parse(userData);
+        actualFollowerId = user.userId || user._id;
+      }
+    }
+    return apiClient.post(`/users/${userId}/follow`, { followerId: actualFollowerId });
   },
 
   async getFollowers(userId: string): Promise<APIResponse<User[]>> {
@@ -43,5 +61,18 @@ export const usersAPI = {
 
   async searchGeniuses(query: string, limit = 20): Promise<APIResponse<User[]>> {
     return apiClient.get(`/users/search?q=${encodeURIComponent(query)}&limit=${limit}`);
+  },
+
+  async voteForGenius(userId: string, voterId?: string): Promise<APIResponse<{ votesReceived: number; message: string }>> {
+    // Get voter ID from localStorage if not provided
+    let actualVoterId = voterId;
+    if (!actualVoterId && typeof window !== 'undefined') {
+      const userData = localStorage.getItem('aga_user_data');
+      if (userData) {
+        const user = JSON.parse(userData);
+        actualVoterId = user.userId || user._id;
+      }
+    }
+    return apiClient.post(`/users/${userId}/vote`, { voterId: actualVoterId });
   },
 };

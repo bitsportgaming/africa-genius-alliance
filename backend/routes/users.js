@@ -191,7 +191,20 @@ router.post('/:userId/vote', async (req, res) => {
             return res.status(400).json({ success: false, error: 'Invalid vote' });
         }
 
-        const targetUser = await User.findOne({ userId: targetUserId });
+        // Helper function to find user by userId or _id
+        const findUser = async (id) => {
+            let user = await User.findOne({ userId: id });
+            if (!user) {
+                try {
+                    user = await User.findById(id);
+                } catch (e) {
+                    // Invalid ObjectId format, ignore
+                }
+            }
+            return user;
+        };
+
+        const targetUser = await findUser(targetUserId);
         if (!targetUser) {
             return res.status(404).json({ success: false, error: 'User not found' });
         }
@@ -207,7 +220,7 @@ router.post('/:userId/vote', async (req, res) => {
         await targetUser.save();
 
         // Also track votes cast by the voter
-        const voter = await User.findOne({ userId: voterId });
+        const voter = await findUser(voterId);
         if (voter) {
             voter.votesCast = (voter.votesCast || 0) + 1;
             await voter.save();
@@ -236,29 +249,46 @@ router.post('/:userId/follow', async (req, res) => {
             return res.status(400).json({ success: false, error: 'Invalid follower' });
         }
 
+        // Helper function to find user by userId or _id
+        const findUser = async (id) => {
+            let user = await User.findOne({ userId: id });
+            if (!user) {
+                try {
+                    user = await User.findById(id);
+                } catch (e) {
+                    // Invalid ObjectId format, ignore
+                }
+            }
+            return user;
+        };
+
         const [targetUser, follower] = await Promise.all([
-            User.findOne({ userId: targetUserId }),
-            User.findOne({ userId: followerId })
+            findUser(targetUserId),
+            findUser(followerId)
         ]);
 
         if (!targetUser || !follower) {
             return res.status(404).json({ success: false, error: 'User not found' });
         }
 
-        const isFollowing = follower.following.includes(targetUserId);
+        // Use the target's userId for consistency in the following arrays
+        const targetUserIdForArray = targetUser.userId;
+        const followerIdForArray = follower.userId;
+
+        const isFollowing = follower.following.includes(targetUserIdForArray);
 
         // Initialize stats24h if not present
         targetUser.stats24h = targetUser.stats24h || { votesDelta: 0, followersDelta: 0, rankDelta: 0, profileViewsDelta: 0 };
 
         if (isFollowing) {
-            follower.following = follower.following.filter(id => id !== targetUserId);
-            targetUser.followers = targetUser.followers.filter(id => id !== followerId);
+            follower.following = follower.following.filter(id => id !== targetUserIdForArray);
+            targetUser.followers = targetUser.followers.filter(id => id !== followerIdForArray);
             follower.followingCount = Math.max(0, follower.followingCount - 1);
             targetUser.followersCount = Math.max(0, targetUser.followersCount - 1);
             targetUser.stats24h.followersDelta = Math.max(0, (targetUser.stats24h.followersDelta || 0) - 1);
         } else {
-            follower.following.push(targetUserId);
-            targetUser.followers.push(followerId);
+            follower.following.push(targetUserIdForArray);
+            targetUser.followers.push(followerIdForArray);
             follower.followingCount += 1;
             targetUser.followersCount += 1;
             targetUser.stats24h.followersDelta = (targetUser.stats24h.followersDelta || 0) + 1;

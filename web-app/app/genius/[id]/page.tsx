@@ -51,6 +51,7 @@ export default function GeniusProfilePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isFollowing, setIsFollowing] = useState(false);
+  const [isVoting, setIsVoting] = useState(false);
 
   useEffect(() => {
     const fetchGeniusProfile = async () => {
@@ -101,6 +102,24 @@ export default function GeniusProfilePage() {
       }
     } catch (err) {
       console.error('Failed to follow/unfollow:', err);
+    }
+  };
+
+  const handleVote = async () => {
+    if (!geniusId || isVoting) return;
+    try {
+      setIsVoting(true);
+      const response: any = await usersAPI.voteForGenius(geniusId);
+      if (response.success && genius) {
+        setGenius({
+          ...genius,
+          votesReceived: response.data.votesReceived,
+        });
+      }
+    } catch (err) {
+      console.error('Failed to vote:', err);
+    } finally {
+      setIsVoting(false);
     }
   };
 
@@ -176,7 +195,14 @@ export default function GeniusProfilePage() {
                     <AGAButton variant={isFollowing ? 'outline' : 'primary'} onClick={handleFollow}>
                       {isFollowing ? 'Following' : 'Follow'}
                     </AGAButton>
-                    <AGAButton variant="secondary" leftIcon={<Vote className="w-5 h-5" />}>Vote</AGAButton>
+                    <AGAButton
+                      variant="secondary"
+                      leftIcon={<Vote className="w-5 h-5" />}
+                      onClick={handleVote}
+                      disabled={isVoting}
+                    >
+                      {isVoting ? 'Voting...' : 'Vote'}
+                    </AGAButton>
                   </div>
                 </div>
 

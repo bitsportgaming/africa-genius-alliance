@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>NSCameraUsageDescription</key>
+	<string>AGA needs access to your camera to broadcast live streams to your supporters.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>AGA needs access to your microphone to broadcast audio during live streams.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>AGA needs access to your photos to share images in posts.</string>
+</dict>
+</plist>

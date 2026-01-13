@@ -2,9 +2,13 @@ const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
 const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+
+// JWT secret from environment or fallback
+const JWT_SECRET = process.env.JWT_SECRET || 'aga-secret-key-change-in-production';
 
 // Configure multer for profile image uploads
 const uploadsDir = path.join(__dirname, '..', 'uploads', 'profiles');

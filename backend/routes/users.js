@@ -100,7 +100,17 @@ router.post('/', async (req, res) => {
 // GET /api/users/:userId/stats - Get user stats for home screen
 router.get('/:userId/stats', async (req, res) => {
     try {
-        const user = await User.findOne({ userId: req.params.userId });
+        const { userId } = req.params;
+        // Support both custom userId and MongoDB _id
+        let user = await User.findOne({ userId: userId });
+        if (!user) {
+            // Try finding by MongoDB _id
+            try {
+                user = await User.findById(userId);
+            } catch (e) {
+                // Invalid ObjectId format, ignore
+            }
+        }
         if (!user) {
             return res.status(404).json({ success: false, error: 'User not found' });
         }

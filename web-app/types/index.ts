@@ -40,6 +40,7 @@ export enum LiveStatus {
 
 export interface User {
   _id: string;
+  userId?: string;  // Custom user ID field from backend
   username: string;
   email: string;
   displayName: string;

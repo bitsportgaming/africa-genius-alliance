@@ -65,6 +65,7 @@ struct MainTabView: View {
                     ProfileView()
                         .tag(4)
                 }
+                .toolbar(.hidden, for: .tabBar) // Hide default tab bar
                 .environmentObject(viewModel)
 
                 // Custom Tab Bar with role awareness
@@ -142,31 +143,63 @@ struct TabBarItem: View {
     let isSelected: Bool
     let action: () -> Void
 
+    @State private var isPressed = false
+    @State private var bounceScale: CGFloat = 1.0
+
     var body: some View {
         Button(action: {
-            let impact = UIImpactFeedbackGenerator(style: .light)
-            impact.impactOccurred()
+            // Trigger bounce animation
+            withAnimation(FluidAnimation.bouncy) {
+                bounceScale = 1.15
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                withAnimation(FluidAnimation.smooth) {
+                    bounceScale = 1.0
+                }
+            }
+
+            HapticFeedback.impact(.light)
             action()
         }) {
             VStack(spacing: 4) {
                 Image(systemName: icon)
                     .font(.system(size: 20, weight: isSelected ? .semibold : .regular))
                     .foregroundColor(isSelected ? Color(hex: "0a4d3c") : .white.opacity(0.7))
+                    .scaleEffect(isSelected ? bounceScale : 1.0)
+                    .animation(FluidAnimation.smooth, value: isSelected)
 
                 Text(label)
                     .font(.system(size: 10, weight: isSelected ? .semibold : .regular))
                     .foregroundColor(isSelected ? Color(hex: "0a4d3c") : .white.opacity(0.7))
+                    .animation(FluidAnimation.smooth, value: isSelected)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 4)
             .background(
-                isSelected ?
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.white.opacity(0.3))
-                    .padding(.horizontal, 8)
-                : nil
+                ZStack {
+                    if isSelected {
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color.white.opacity(0.3))
+                            .padding(.horizontal, 8)
+                            .transition(.scale.combined(with: .opacity))
+                    }
+                }
+                .animation(FluidAnimation.smooth, value: isSelected)
             )
+            .scaleEffect(isPressed ? 0.92 : 1.0)
+            .animation(FluidAnimation.snappy, value: isPressed)
         }
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in
+                    if !isPressed {
+                        isPressed = true
+                    }
+                }
+                .onEnded { _ in
+                    isPressed = false
+                }
+        )
     }
 }
 

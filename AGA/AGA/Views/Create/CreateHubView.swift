@@ -118,8 +118,7 @@ struct CreateHubView: View {
                 subtitle: "Create long-form policy or manifesto updates",
                 icon: "doc.text.fill",
                 color: Color(hex: "8b5cf6"),
-                isLarge: true,
-                isComingSoon: true
+                isLarge: true
             ) {
                 showProposals = true
             }
@@ -539,7 +538,7 @@ struct ProposalsSheet: View {
                     description: description,
                     category: selectedCategory,
                     proposerId: user.id,
-                    proposerName: user.displayName,
+                    proposerName: user.fullName,
                     endDate: endDate
                 )
 

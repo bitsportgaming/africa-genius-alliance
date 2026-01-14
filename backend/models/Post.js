@@ -76,6 +76,10 @@ const postSchema = new mongoose.Schema({
         enum: ['regular', 'genius', 'admin', 'superadmin'],
         default: 'regular'
     },
+    declaration: {
+        type: String,
+        default: null
+    },
     status: {
         type: String,
         enum: ['active', 'hidden', 'removed'],

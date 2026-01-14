@@ -258,27 +258,37 @@ export default function GeniusProfilePage() {
           {/* Posts */}
           <section>
             <h2 className="text-2xl font-bold text-text-dark mb-4">Posts</h2>
-            {posts.length > 0 ? (
-              <div className="space-y-4">
-                {posts.map((post) => (
-                  <AGACard key={post._id} variant="elevated" padding="lg">
-                    <p className="text-text-dark mb-4">{post.content}</p>
-                    <div className="flex items-center gap-6 pt-3 border-t border-gray-200 text-text-gray text-sm">
-                      <span className="flex items-center gap-1"><Heart className="w-4 h-4" />{post.likesCount}</span>
-                      <span className="flex items-center gap-1"><MessageCircle className="w-4 h-4" />{post.commentsCount}</span>
-                      <span className="flex items-center gap-1"><Share2 className="w-4 h-4" />{post.sharesCount}</span>
-                      <span className="ml-auto">{new Date(post.createdAt).toLocaleDateString()}</span>
+            {/* Compact Twitter-style posts container */}
+            <div className="max-w-2xl">
+              {posts.length > 0 ? (
+                <div className="space-y-3">
+                  {posts.map((post) => (
+                    <div
+                      key={post._id}
+                      className="bg-white rounded-xl border border-gray-100 p-4 transition-all hover:bg-gray-50"
+                    >
+                      <p className="text-text-dark text-sm leading-relaxed mb-3">{post.content}</p>
+                      <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                        <span className="flex items-center gap-1.5 px-2 py-1 rounded-full text-text-gray hover:text-red-500 hover:bg-red-50 transition-colors text-xs">
+                          <Heart className="w-4 h-4" />{post.likesCount}
+                        </span>
+                        <span className="flex items-center gap-1.5 px-2 py-1 rounded-full text-text-gray hover:text-primary hover:bg-primary/10 transition-colors text-xs">
+                          <MessageCircle className="w-4 h-4" />{post.commentsCount}
+                        </span>
+                        <span className="flex items-center gap-1.5 px-2 py-1 rounded-full text-text-gray hover:text-green-500 hover:bg-green-50 transition-colors text-xs">
+                          <Share2 className="w-4 h-4" />{post.sharesCount}
+                        </span>
+                        <span className="text-text-gray text-xs">{new Date(post.createdAt).toLocaleDateString()}</span>
+                      </div>
                     </div>
-                  </AGACard>
-                ))}
-              </div>
-            ) : (
-              <AGACard variant="elevated" padding="lg">
-                <div className="text-center py-8 text-text-gray">
-                  <p>No posts yet</p>
+                  ))}
                 </div>
-              </AGACard>
-            )}
+              ) : (
+                <div className="bg-white rounded-xl border border-gray-100 p-6 text-center text-text-gray">
+                  <p className="text-sm">No posts yet</p>
+                </div>
+              )}
+            </div>
           </section>
         </div>
       </DashboardLayout>

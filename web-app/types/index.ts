@@ -135,34 +135,56 @@ export interface GeniusProfile {
 }
 
 export interface Vote {
-  _id: string;
-  voterId: string;
-  targetGeniusId: string;
-  positionId?: string;
-  weight: number; // 1-4
-  timestamp: string;
-  transactionHash?: string;
+  voteId: string;
+  electionId: string;
+  userId: string;
+  candidateId: string;
+  candidateName?: string;
+  votedAt: string;
+  blockchain: BlockchainInfo;
+}
+
+export interface BlockchainInfo {
+  transactionHash: string;
+  blockNumber: number;
+  blockHash?: string;
+  gasUsed?: string;
+  status: 'pending' | 'confirmed' | 'failed';
+  confirmedAt?: string;
+  chainId: number;
+  explorerUrl?: string;
 }
 
 export interface Election {
-  _id: string;
-  electionName: string;
+  electionId: string;
+  title: string;
   description: string;
-  positions: string[];
+  position: string;
   candidates: ElectionCandidate[];
   startDate: string;
   endDate: string;
   country?: string;
   region?: string;
-  isActive: boolean;
+  status: 'upcoming' | 'active' | 'completed';
+  totalVotes: number;
+  totalVoters: number;
+  blockchain?: {
+    electionIdOnChain: number;
+    isDeployed: boolean;
+    deployTxHash?: string;
+    chainId: number;
+  };
 }
 
 export interface ElectionCandidate {
+  candidateId: string;
   userId: string;
   name: string;
-  avatar?: string;
-  position: string;
-  votes: number;
+  party?: string;
+  bio?: string;
+  manifesto?: string;
+  avatarURL?: string;
+  votesReceived: number;
 }
 
 export interface LiveStream {

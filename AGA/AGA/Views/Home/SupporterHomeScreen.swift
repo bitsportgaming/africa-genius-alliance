@@ -43,15 +43,14 @@ struct SupporterHomeScreen: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                Color(hex: "f9fafb").ignoresSafeArea()
+        ZStack {
+            Color(hex: "f9fafb").ignoresSafeArea()
 
-                if isLoading {
-                    ProgressView()
-                        .scaleEffect(1.2)
-                } else {
-                    ScrollView(showsIndicators: false) {
+            if isLoading {
+                ProgressView()
+                    .scaleEffect(1.2)
+            } else {
+                ScrollView(showsIndicators: false) {
                     VStack(spacing: 0) {
                         // Top Bar
                         HomeTopBar(
@@ -99,48 +98,40 @@ struct SupporterHomeScreen: View {
                         .padding(.top, 16)
                         .padding(.bottom, 100)
                     }
-                    }
                 }
             }
-            .task {
-                await loadData()
-            }
-            .sheet(isPresented: $showSearch) {
-                SearchGeniusesSheet()
-            }
-            .sheet(item: $showGeniusDetail) { genius in
-                GeniusDetailSheet(genius: genius, userId: authViewModel.currentUser?.id ?? "")
-            }
-            .sheet(item: $showCategoryDetail) { category in
-                CategoryDetailSheet(category: category)
-            }
-            .sheet(item: $showComments) { post in
-                CommentsSheet(post: post)
-            }
-            .sheet(item: $showShareSheet) { post in
-                ShareSheet(post: post)
-            }
-            .fullScreenCover(item: $selectedLiveStream) { stream in
-                LiveStreamViewerView(stream: stream)
-            }
-            .sheet(isPresented: $showInbox) {
-                InboxSheet(userId: authViewModel.currentUser?.id ?? "")
-            }
-            .sheet(isPresented: $showProfile) {
-                NavigationStack {
-                    ProfileView()
-                        .toolbar {
-                            ToolbarItem(placement: .navigationBarLeading) {
-                                Button("Done") { showProfile = false }
-                            }
-                        }
-                }
-            }
-            .alert("Vote Submitted!", isPresented: $showVoteSuccess) {
-                Button("OK", role: .cancel) { }
-            } message: {
-                Text("Your vote for \(votedGeniusName) has been recorded. Thank you for supporting!")
-            }
+        }
+        .task {
+            await loadData()
+        }
+        .sheet(isPresented: $showSearch) {
+            SearchGeniusesSheet()
+        }
+        .sheet(item: $showGeniusDetail) { genius in
+            GeniusDetailSheet(genius: genius, userId: authViewModel.currentUser?.id ?? "")
+        }
+        .sheet(item: $showCategoryDetail) { category in
+            CategoryDetailSheet(category: category)
+        }
+        .sheet(item: $showComments) { post in
+            CommentsSheet(post: post)
+        }
+        .sheet(item: $showShareSheet) { post in
+            ShareSheet(post: post)
+        }
+        .fullScreenCover(item: $selectedLiveStream) { stream in
+            LiveStreamViewerView(stream: stream)
+        }
+        .sheet(isPresented: $showInbox) {
+            InboxSheet(userId: authViewModel.currentUser?.id ?? "")
+        }
+        .sheet(isPresented: $showProfile) {
+            ProfileView()
+        }
+        .alert("Vote Submitted!", isPresented: $showVoteSuccess) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("Your vote for \(votedGeniusName) has been recorded. Thank you for supporting!")
         }
     }
 
@@ -213,16 +204,18 @@ struct SupporterHomeScreen: View {
             }
 
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
-                    ForEach(geniuses) { genius in
+                LazyHStack(spacing: 12) {
+                    ForEach(Array(geniuses.enumerated()), id: \.element.id) { index, genius in
                         GeniusCardSmall(
                             genius: genius,
                             onTap: { showGeniusDetail = genius },
                             onFollow: { followGenius(genius) },
                             onVote: { voteForGenius(genius) }
                         )
+                        .staggeredAppear(index: index, baseDelay: 0.03)
                     }
                 }
+                .padding(.horizontal, 1) // Prevent edge clipping
             }
         }
     }
@@ -259,6 +252,7 @@ struct SupporterHomeScreen: View {
                         }
                     }
                 }
+                .padding(.horizontal, 1) // Prevent clipping at edges
             }
         }
     }
@@ -319,6 +313,12 @@ struct SupporterHomeScreen: View {
                     Circle()
                         .fill(Color(hex: "ef4444"))
                         .frame(width: 8, height: 8)
+                        .overlay(
+                            Circle()
+                                .fill(Color(hex: "ef4444").opacity(0.5))
+                                .scaleEffect(1.5)
+                                .opacity(0.6)
+                        )
                     Text("🔴 Live Now")
                         .font(.system(size: 16, weight: .bold))
                         .foregroundColor(Color(hex: "1f2937"))
@@ -332,12 +332,18 @@ struct SupporterHomeScreen: View {
             }
 
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
-                    ForEach(liveStreams) { stream in
+                LazyHStack(spacing: 12) {
+                    ForEach(Array(liveStreams.enumerated()), id: \.element.id) { index, stream in
                         LiveStreamMiniCard(stream: stream)
-                            .onTapGesture { selectedLiveStream = stream }
+                            .pressableStyle(scale: 0.96)
+                            .onTapGesture {
+                                HapticFeedback.impact(.medium)
+                                selectedLiveStream = stream
+                            }
+                            .staggeredAppear(index: index, baseDelay: 0.04)
                     }
                 }
+                .padding(.horizontal, 1) // Prevent edge clipping
             }
         }
     }
@@ -423,6 +429,7 @@ struct QuickStatPill: View {
     let value: String
     let icon: String
     let color: Color
+    @State private var isPressed = false
 
     var body: some View {
         VStack(spacing: 6) {
@@ -442,7 +449,14 @@ struct QuickStatPill: View {
         .padding(.vertical, 12)
         .background(Color.white)
         .cornerRadius(12)
-        .shadow(color: .black.opacity(0.03), radius: 4, x: 0, y: 2)
+        .shadow(color: .black.opacity(isPressed ? 0.06 : 0.03), radius: isPressed ? 2 : 4, x: 0, y: isPressed ? 1 : 2)
+        .scaleEffect(isPressed ? 0.96 : 1.0)
+        .animation(FluidAnimation.snappy, value: isPressed)
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in isPressed = true }
+                .onEnded { _ in isPressed = false }
+        )
     }
 }
 
@@ -455,6 +469,10 @@ struct FeedPostCard: View {
     @State private var isLiked: Bool
     @State private var likesCount: Int
     @State private var isBookmarked = false
+    @State private var likeScale: CGFloat = 1.0
+    @State private var bookmarkScale: CGFloat = 1.0
+    @State private var commentScale: CGFloat = 1.0
+    @State private var shareScale: CGFloat = 1.0
     @Environment(AuthService.self) private var authService
 
     init(post: FeedPost, onComment: (() -> Void)? = nil, onShare: (() -> Void)? = nil, onBookmark: (() -> Void)? = nil) {
@@ -468,6 +486,16 @@ struct FeedPostCard: View {
 
     private func handleLike() async {
         guard let userId = authService.currentUser?.id else { return }
+
+        // Animate the heart
+        withAnimation(FluidAnimation.bouncy) {
+            likeScale = 1.3
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            withAnimation(FluidAnimation.smooth) {
+                likeScale = 1.0
+            }
+        }
 
         // Optimistically update UI
         isLiked.toggle()
@@ -572,7 +600,7 @@ struct FeedPostCard: View {
                 .clipped()
             }
 
-            // Action Bar
+            // Action Bar with fluid animations
             HStack(spacing: 24) {
                 Button(action: {
                     Task {
@@ -582,13 +610,26 @@ struct FeedPostCard: View {
                     HStack(spacing: 4) {
                         Image(systemName: isLiked ? "heart.fill" : "heart")
                             .foregroundColor(isLiked ? Color(hex: "ef4444") : Color(hex: "6b7280"))
+                            .scaleEffect(likeScale)
+                            .animation(FluidAnimation.bouncy, value: isLiked)
                         Text("\(likesCount)")
                             .font(.system(size: 12))
                             .foregroundColor(Color(hex: "6b7280"))
                     }
                 }
 
-                Button(action: { onComment?() }) {
+                Button(action: {
+                    withAnimation(FluidAnimation.snappy) {
+                        commentScale = 0.85
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        withAnimation(FluidAnimation.smooth) {
+                            commentScale = 1.0
+                        }
+                    }
+                    HapticFeedback.impact(.light)
+                    onComment?()
+                }) {
                     HStack(spacing: 4) {
                         Image(systemName: "bubble.left")
                             .foregroundColor(Color(hex: "6b7280"))
@@ -596,9 +637,21 @@ struct FeedPostCard: View {
                             .font(.system(size: 12))
                             .foregroundColor(Color(hex: "6b7280"))
                     }
+                    .scaleEffect(commentScale)
                 }
 
-                Button(action: { onShare?() }) {
+                Button(action: {
+                    withAnimation(FluidAnimation.snappy) {
+                        shareScale = 0.85
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        withAnimation(FluidAnimation.smooth) {
+                            shareScale = 1.0
+                        }
+                    }
+                    HapticFeedback.impact(.light)
+                    onShare?()
+                }) {
                     HStack(spacing: 4) {
                         Image(systemName: "arrow.2.squarepath")
                             .foregroundColor(Color(hex: "6b7280"))
@@ -606,16 +659,27 @@ struct FeedPostCard: View {
                             .font(.system(size: 12))
                             .foregroundColor(Color(hex: "6b7280"))
                     }
+                    .scaleEffect(shareScale)
                 }
 
                 Spacer()
 
                 Button(action: {
-                    isBookmarked.toggle()
+                    withAnimation(FluidAnimation.bouncy) {
+                        bookmarkScale = 1.3
+                        isBookmarked.toggle()
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                        withAnimation(FluidAnimation.smooth) {
+                            bookmarkScale = 1.0
+                        }
+                    }
+                    HapticFeedback.impact(.light)
                     onBookmark?()
                 }) {
                     Image(systemName: isBookmarked ? "bookmark.fill" : "bookmark")
                         .foregroundColor(isBookmarked ? Color(hex: "f59e0b") : Color(hex: "6b7280"))
+                        .scaleEffect(bookmarkScale)
                 }
             }
             .font(.system(size: 16))
@@ -624,6 +688,7 @@ struct FeedPostCard: View {
         .background(Color.white)
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 2)
+        .pressableStyle(scale: 0.98)
     }
 
     private func timeAgo(from date: Date) -> String {

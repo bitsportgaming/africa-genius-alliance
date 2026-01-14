@@ -1,124 +1,135 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ProtectedRoute } from '@/components/layout/ProtectedRoute';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { UserRole } from '@/types';
+import { UserRole, Election } from '@/types';
 import { AGACard, AGAButton, AGAPill } from '@/components/ui';
-import { Vote as VoteIcon, Trophy, Users, Calendar, ChevronRight, CheckCircle } from 'lucide-react';
+import { Vote as VoteIcon, Trophy, Users, Calendar, ChevronRight, CheckCircle, ExternalLink, RefreshCw } from 'lucide-react';
 import { ElectionCard } from '@/components/vote/ElectionCard';
 import { VotingModal } from '@/components/vote/VotingModal';
+import { votingAPI } from '@/lib/api';
+import { useAuth } from '@/lib/auth/AuthContext';
 
 export default function VotePage() {
-  const [selectedElection, setSelectedElection] = useState<any>(null);
+  const { user } = useAuth();
+  const [selectedElection, setSelectedElection] = useState<Election | null>(null);
   const [showVotingModal, setShowVotingModal] = useState(false);
+  const [elections, setElections] = useState<Election[]>([]);
+  const [myVotes, setMyVotes] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [countryFilter, setCountryFilter] = useState('');
 
-  // Mock data - Replace with real API calls
-  const activeElections = [
-    {
-      _id: '1',
-      electionName: 'Presidential Election 2024',
-      description: 'National presidential election to select the next leader',
-      positions: ['President', 'Vice President'],
-      startDate: '2024-01-01',
-      endDate: '2024-12-31',
-      country: 'Nigeria',
-      region: 'National',
-      isActive: true,
-      candidates: [
-        {
-          userId: '1',
-          name: 'Amina Okafor',
-          avatar: 'AO',
-          position: 'Presidential Candidate',
-          votes: 5432,
-          category: 'Political',
-          manifesto: 'Healthcare reform and economic development for all Nigerians.',
-        },
-        {
-          userId: '2',
-          name: 'Kwame Mensah',
-          avatar: 'KM',
-          position: 'Presidential Candidate',
-          votes: 4891,
-          category: 'Political',
-          manifesto: 'Education and infrastructure development as national priorities.',
-        },
-        {
-          userId: '3',
-          name: 'Zainab Hassan',
-          avatar: 'ZH',
-          position: 'Presidential Candidate',
-          votes: 4567,
-          category: 'Political',
-          manifesto: 'Universal healthcare and social welfare programs.',
-        },
-      ],
-      totalVotes: 14890,
-      totalVoters: 8234,
-    },
-    {
-      _id: '2',
-      electionName: 'Minister of Education - Ghana',
-      description: 'Selection of the Minister of Education for Ghana',
-      positions: ['Minister of Education'],
-      startDate: '2024-06-01',
-      endDate: '2024-12-31',
-      country: 'Ghana',
-      region: 'National',
-      isActive: true,
-      candidates: [
-        {
-          userId: '4',
-          name: 'Thabo Ndlovu',
-          avatar: 'TN',
-          position: 'Education Reform Leader',
-          votes: 3234,
-          category: 'Political',
-          manifesto: 'Technology-driven education transformation.',
-        },
-        {
-          userId: '5',
-          name: 'Fatima Diallo',
-          avatar: 'FD',
-          position: 'Education Specialist',
-          votes: 2998,
-          category: 'Technical',
-          manifesto: 'Quality education accessible to every child.',
-        },
-      ],
-      totalVotes: 6232,
-      totalVoters: 3456,
-    },
-  ];
+  // Fetch elections
+  const fetchElections = async () => {
+    setLoading(true);
+    try {
+      const response = await votingAPI.getActiveElections();
+      if (response.success && response.data) {
+        let filtered = response.data;
+        if (countryFilter) {
+          filtered = filtered.filter(e => e.country === countryFilter);
+        }
+        setElections(filtered);
+      }
+    } catch (error) {
+      console.error('Failed to fetch elections:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const myVotes = [
-    {
-      electionName: 'City Council - Lagos',
-      candidate: 'Samuel Adebayo',
-      votes: 4,
-      date: '2024-01-10',
-      transactionHash: '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb',
-    },
-  ];
+  // Fetch user's vote history
+  const fetchMyVotes = async () => {
+    if (!user?.userId) return;
 
-  const handleVote = (election: any) => {
+    // Check each election for user's votes
+    const votesPromises = elections.map(async (election) => {
+      try {
+        const response = await votingAPI.checkVote(election.electionId, user.userId);
+        if (response.success && response.data?.hasVoted) {
+          const candidate = election.candidates.find(c => c.candidateId === response.data?.vote?.candidateId);
+          return {
+            electionId: election.electionId,
+            electionTitle: election.title,
+            candidateName: candidate?.name || 'Unknown',
+            votedAt: response.data.vote?.votedAt,
+            transactionHash: response.data.vote?.blockchain?.transactionHash,
+            blockNumber: response.data.vote?.blockchain?.blockNumber,
+          };
+        }
+        return null;
+      } catch {
+        return null;
+      }
+    });
+
+    const votes = (await Promise.all(votesPromises)).filter(Boolean);
+    setMyVotes(votes);
+  };
+
+  useEffect(() => {
+    fetchElections();
+  }, [countryFilter]);
+
+  useEffect(() => {
+    if (elections.length > 0) {
+      fetchMyVotes();
+    }
+  }, [elections, user?.userId]);
+
+  const handleVote = (election: Election) => {
     setSelectedElection(election);
     setShowVotingModal(true);
   };
+
+  const handleVoteComplete = () => {
+    setShowVotingModal(false);
+    setSelectedElection(null);
+    fetchElections();
+    fetchMyVotes();
+  };
+
+  const totalVoters = elections.reduce((sum, e) => sum + (e.totalVoters || 0), 0);
 
   return (
     <ProtectedRoute requiredRole={UserRole.SUPPORTER}>
       <DashboardLayout>
         <div className="max-w-6xl mx-auto space-y-8">
           {/* Header */}
-          <div>
-            <h1 className="text-4xl font-black text-text-dark mb-2">
-              Vote for Leaders
-            </h1>
-            <p className="text-lg text-text-gray">
-              Your voice matters. Vote based on merit and drive real change across Africa.
-            </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-4xl font-black text-text-dark mb-2">
+                Vote for Leaders
+              </h1>
+              <p className="text-lg text-text-gray">
+                Your voice matters. Vote based on merit and drive real change across Africa.
+              </p>
+            </div>
+            <button
+              onClick={fetchElections}
+              disabled={loading}
+              className="p-2 rounded-lg bg-primary/10 hover:bg-primary/20 transition-colors"
+            >
+              <RefreshCw className={`w-5 h-5 text-primary ${loading ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
+
+          {/* Country Filter */}
+          <div className="flex gap-2 flex-wrap">
+            {['', 'Nigeria', 'South Africa', 'Kenya', 'Ghana', 'Egypt'].map(country => (
+              <button
+                key={country}
+                onClick={() => setCountryFilter(country)}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                  countryFilter === country
+                    ? 'bg-primary text-white'
+                    : 'bg-surface-light text-text-gray hover:bg-primary/10'
+                }`}
+              >
+                {country || 'All Countries'}
+              </button>
+            ))}
           </div>
 
           {/* Stats Overview */}
@@ -132,7 +143,7 @@ export default function VotePage() {
                   <h3 className="text-3xl font-black text-text-dark">
                     {myVotes.length}
                   </h3>
-                  <p className="text-sm text-text-gray mt-1">Votes Cast</p>
+                  <p className="text-sm text-text-gray mt-1">My Votes</p>
                 </div>
               </div>
             </AGACard>
@@ -144,7 +155,7 @@ export default function VotePage() {
                 </div>
                 <div>
                   <h3 className="text-3xl font-black text-text-dark">
-                    {activeElections.length}
+                    {elections.length}
                   </h3>
                   <p className="text-sm text-text-gray mt-1">Active Elections</p>
                 </div>
@@ -158,7 +169,7 @@ export default function VotePage() {
                 </div>
                 <div>
                   <h3 className="text-3xl font-black text-text-dark">
-                    {activeElections.reduce((sum, e) => sum + e.totalVoters, 0).toLocaleString()}
+                    {totalVoters.toLocaleString()}
                   </h3>
                   <p className="text-sm text-text-gray mt-1">Total Voters</p>
                 </div>
@@ -168,7 +179,7 @@ export default function VotePage() {
 
           {/* How Voting Works */}
           <AGACard variant="hero" padding="lg">
-            <h3 className="font-bold text-text-dark mb-4">🗳️ How Voting Works</h3>
+            <h3 className="font-bold text-text-dark mb-4">🗳️ How Classic Voting Works</h3>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="text-center">
                 <div className="w-12 h-12 rounded-full bg-primary text-white flex items-center justify-center font-bold text-lg mx-auto mb-2">
@@ -186,41 +197,51 @@ export default function VotePage() {
                 <div className="w-12 h-12 rounded-full bg-primary text-white flex items-center justify-center font-bold text-lg mx-auto mb-2">
                   3
                 </div>
-                <p className="text-sm text-text-gray">Cast 1-4 votes per candidate</p>
+                <p className="text-sm text-text-gray">Select 1 candidate per election</p>
               </div>
               <div className="text-center">
                 <div className="w-12 h-12 rounded-full bg-primary text-white flex items-center justify-center font-bold text-lg mx-auto mb-2">
                   4
                 </div>
-                <p className="text-sm text-text-gray">Get blockchain confirmation</p>
+                <p className="text-sm text-text-gray">Get blockchain verification</p>
               </div>
             </div>
           </AGACard>
 
           {/* Active Elections */}
           <section>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-2xl font-bold text-text-dark">
-                Active Elections ({activeElections.length})
-              </h2>
-              <select className="px-4 py-2 rounded-lg border border-gray-200 text-text-dark focus:outline-none focus:ring-2 focus:ring-primary/20">
-                <option>All Countries</option>
-                <option>Nigeria</option>
-                <option>Ghana</option>
-                <option>Kenya</option>
-                <option>South Africa</option>
-              </select>
-            </div>
+            <h2 className="text-2xl font-bold text-text-dark mb-4">
+              Active Elections ({elections.length})
+            </h2>
 
-            <div className="space-y-6">
-              {activeElections.map((election) => (
-                <ElectionCard
-                  key={election._id}
-                  election={election}
-                  onVote={() => handleVote(election)}
-                />
-              ))}
-            </div>
+            {loading ? (
+              <div className="text-center py-12">
+                <RefreshCw className="w-8 h-8 text-primary animate-spin mx-auto mb-3" />
+                <p className="text-text-gray">Loading elections...</p>
+              </div>
+            ) : elections.length === 0 ? (
+              <AGACard variant="elevated" padding="lg">
+                <div className="text-center py-8 text-text-gray">
+                  <Trophy className="w-16 h-16 text-gray-300 mx-auto mb-3" />
+                  <p>No active elections found</p>
+                  <p className="text-sm mt-1">Check back later for upcoming elections</p>
+                </div>
+              </AGACard>
+            ) : (
+              <div className="space-y-6">
+                {elections.map((election) => {
+                  const hasVoted = myVotes.some(v => v.electionId === election.electionId);
+                  return (
+                    <ElectionCard
+                      key={election.electionId}
+                      election={election}
+                      hasVoted={hasVoted}
+                      onVote={() => handleVote(election)}
+                    />
+                  );
+                })}
+              </div>
+            )}
           </section>
 
           {/* My Voting History */}
@@ -237,30 +258,40 @@ export default function VotePage() {
                         <CheckCircle className="w-6 h-6 text-green-500 mt-1" />
                         <div>
                           <h3 className="font-bold text-text-dark mb-1">
-                            {vote.electionName}
+                            {vote.electionTitle}
                           </h3>
                           <p className="text-sm text-text-gray mb-2">
-                            Voted for: <span className="font-semibold text-text-dark">{vote.candidate}</span>
+                            Voted for: <span className="font-semibold text-text-dark">{vote.candidateName}</span>
                           </p>
                           <div className="flex items-center gap-4 text-xs text-text-gray">
-                            <span>
-                              {vote.votes} vote{vote.votes > 1 ? 's' : ''}
-                            </span>
+                            <span>Block #{vote.blockNumber || 'Pending'}</span>
                             <span>•</span>
-                            <span>{vote.date}</span>
+                            <span>{vote.votedAt ? new Date(vote.votedAt).toLocaleDateString() : 'Processing'}</span>
                           </div>
                         </div>
                       </div>
                       <AGAPill variant="success" size="sm">
-                        Confirmed
+                        Verified
                       </AGAPill>
                     </div>
-                    <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-                      <p className="text-xs text-text-gray mb-1">Transaction Hash:</p>
-                      <code className="text-xs text-primary break-all">
-                        {vote.transactionHash}
-                      </code>
-                    </div>
+                    {vote.transactionHash && (
+                      <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+                        <p className="text-xs text-text-gray mb-1">Transaction Hash:</p>
+                        <div className="flex items-center gap-2">
+                          <code className="text-xs text-primary break-all flex-1">
+                            {vote.transactionHash}
+                          </code>
+                          <a
+                            href={`https://testnet.bscscan.com/tx/${vote.transactionHash}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary hover:text-primary/80"
+                          >
+                            <ExternalLink className="w-4 h-4" />
+                          </a>
+                        </div>
+                      </div>
+                    )}
                   </AGACard>
                 ))}
               </div>
@@ -280,10 +311,7 @@ export default function VotePage() {
         {showVotingModal && selectedElection && (
           <VotingModal
             election={selectedElection}
-            onClose={() => {
-              setShowVotingModal(false);
-              setSelectedElection(null);
-            }}
+            onClose={handleVoteComplete}
           />
         )}
       </DashboardLayout>

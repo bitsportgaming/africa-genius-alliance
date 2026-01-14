@@ -122,16 +122,30 @@ export interface Election {
   title: string;
   description: string;
   position: string;
+  country: string;
+  region?: string;
   status: 'upcoming' | 'active' | 'completed';
   startDate: string;
   endDate: string;
   candidates: Candidate[];
+  totalVotes: number;
+  totalVoters: number;
+  blockchain?: {
+    electionIdOnChain: number;
+    isDeployed: boolean;
+    deployTxHash: string;
+    chainId: number;
+  };
 }
 
 export interface Candidate {
   candidateId: string;
+  userId: string;
   name: string;
   party: string;
+  bio: string;
+  manifesto: string;
+  avatarURL: string;
   votesReceived: number;
 }
 
@@ -140,9 +154,16 @@ export interface CreateElectionData {
   description: string;
   position: string;
   country?: string;
+  region?: string;
   startDate: string;
   endDate: string;
-  candidates: { name: string; party?: string; bio?: string }[];
+  candidates: {
+    name: string;
+    party?: string;
+    bio?: string;
+    manifesto?: string;
+    userId?: string;
+  }[];
 }
 
 export default api;

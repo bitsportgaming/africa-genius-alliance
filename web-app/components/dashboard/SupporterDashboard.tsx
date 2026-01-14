@@ -498,132 +498,153 @@ export function SupporterDashboard() {
           </div>
         </div>
 
-        <div className="space-y-6">
-          {feedPosts.map((post) => (
-            <AGACard
-              key={post._id}
-              variant={post.isAdminPost ? 'hero' : 'elevated'}
-              padding="lg"
-              className={post.isAdminPost ? 'border-2 border-yellow-400/30 bg-gradient-to-r from-yellow-50/50 to-amber-50/50' : ''}
-            >
-              {/* Admin Post Badge */}
-              {post.isAdminPost && (
-                <div className="flex items-center gap-2 mb-3 pb-3 border-b border-yellow-400/20">
-                  <div className="flex items-center gap-1.5 px-2.5 py-1 bg-gradient-to-r from-yellow-400 to-amber-500 rounded-full">
-                    <ShieldCheck className="w-3.5 h-3.5 text-white" />
-                    <span className="text-xs font-bold text-white">Official AGA Announcement</span>
+        {/* Compact Twitter-style feed container */}
+        <div className="max-w-2xl mx-auto">
+          <div className="space-y-4">
+            {feedPosts.map((post) => (
+              <div
+                key={post._id}
+                className={`bg-white rounded-xl border transition-all hover:bg-gray-50 ${
+                  post.isAdminPost
+                    ? 'border-yellow-300 bg-gradient-to-r from-yellow-50/30 to-amber-50/30'
+                    : 'border-gray-100'
+                }`}
+              >
+                {/* Admin Post Badge */}
+                {post.isAdminPost && (
+                  <div className="flex items-center gap-2 px-4 py-2 border-b border-yellow-200/50">
+                    <div className="flex items-center gap-1.5 px-2 py-0.5 bg-gradient-to-r from-yellow-400 to-amber-500 rounded-full">
+                      <ShieldCheck className="w-3 h-3 text-white" />
+                      <span className="text-[10px] font-bold text-white">Official AGA Announcement</span>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Post Header */}
-              <div className="flex items-start gap-4 mb-4">
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold ${post.isAdminPost ? 'bg-gradient-to-br from-yellow-400 to-amber-600' : 'bg-gradient-accent'}`}>
-                  {post.isAdminPost ? '✦' : (post.authorName?.[0]?.toUpperCase() || 'U')}
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-bold text-text-dark">{post.authorName}</h3>
-                    {post.isAdminPost && (
-                      <div className="flex items-center" title="Verified Admin">
-                        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
-                          <path d="M9 12l2 2 4-4" stroke="#EAB308" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="#FBBF24" stroke="#EAB308" strokeWidth="1"/>
-                        </svg>
+                <div className="p-4">
+                  {/* Post Header - Compact */}
+                  <div className="flex items-start gap-3 mb-3">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold text-sm flex-shrink-0 ${
+                      post.isAdminPost
+                        ? 'bg-gradient-to-br from-yellow-400 to-amber-600'
+                        : 'bg-gradient-accent'
+                    }`}>
+                      {post.isAdminPost ? '✦' : (post.authorName?.[0]?.toUpperCase() || 'U')}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <h3 className="font-semibold text-text-dark text-sm">{post.authorName}</h3>
+                        {post.isAdminPost && (
+                          <div className="flex items-center" title="Verified Admin">
+                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
+                              <path d="M9 12l2 2 4-4" stroke="#EAB308" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="#FBBF24" stroke="#EAB308" strokeWidth="1"/>
+                            </svg>
+                          </div>
+                        )}
+                        <span className="text-text-gray text-xs">·</span>
+                        <span className="text-text-gray text-xs">{post.authorPosition}</span>
+                        <span className="text-text-gray text-xs">·</span>
+                        <span className="text-text-gray text-xs">
+                          {new Date(post.createdAt).toLocaleDateString()}
+                        </span>
                       </div>
+                    </div>
+                    {!post.isAdminPost && (
+                      <button
+                        onClick={() => handleFollow(post.authorId)}
+                        className={`text-xs font-semibold px-3 py-1 rounded-full transition-colors ${
+                          followingUsers.has(post.authorId)
+                            ? 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            : 'bg-primary text-white hover:bg-primary/90'
+                        }`}
+                      >
+                        {followingUsers.has(post.authorId) ? 'Following' : 'Follow'}
+                      </button>
                     )}
                   </div>
-                  <p className="text-sm text-text-gray">{post.authorPosition}</p>
-                  <p className="text-xs text-text-gray mt-1">
-                    {new Date(post.createdAt).toLocaleDateString()}
+
+                  {/* Post Content - Compact */}
+                  <p className="text-text-dark text-sm leading-relaxed mb-3">
+                    {post.content}
                   </p>
-                </div>
-                {!post.isAdminPost && (
-                  <AGAButton
-                    variant={followingUsers.has(post.authorId) ? 'outline' : 'ghost'}
-                    size="sm"
-                    onClick={() => handleFollow(post.authorId)}
-                  >
-                    {followingUsers.has(post.authorId) ? 'Following' : 'Follow'}
-                  </AGAButton>
-                )}
-              </div>
 
-              {/* Post Content */}
-              <p className="text-text-dark mb-4 leading-relaxed">
-                {post.content}
-              </p>
-
-              {/* Post Images */}
-              {post.mediaURLs && post.mediaURLs.length > 0 && (
-                <div className="mb-4 rounded-xl overflow-hidden">
-                  {post.mediaURLs.length === 1 ? (
-                    <div className="relative">
-                      <img
-                        src={`${process.env.NEXT_PUBLIC_API_URL || 'https://africageniusalliance.com'}${post.mediaURLs[0]}`}
-                        alt="Post image"
-                        className="w-full h-auto max-h-[500px] object-cover"
-                      />
-                      <div className="absolute bottom-4 right-4 text-white/15 font-bold text-2xl pointer-events-none select-none">
-                        Africa Genius Alliance
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-2">
-                      {post.mediaURLs.slice(0, 4).map((url, index) => (
-                        <div key={index} className="relative">
+                  {/* Post Images - Compact */}
+                  {post.mediaURLs && post.mediaURLs.length > 0 && (
+                    <div className="mb-3 rounded-lg overflow-hidden border border-gray-100">
+                      {post.mediaURLs.length === 1 ? (
+                        <div className="relative">
                           <img
-                            src={`${process.env.NEXT_PUBLIC_API_URL || 'https://africageniusalliance.com'}${url}`}
-                            alt={`Post image ${index + 1}`}
-                            className="w-full h-48 object-cover"
+                            src={`${process.env.NEXT_PUBLIC_API_URL || 'https://africageniusalliance.com'}${post.mediaURLs[0]}`}
+                            alt="Post image"
+                            className="w-full h-auto max-h-[300px] object-cover"
                           />
-                          {index === 3 && post.mediaURLs!.length > 4 && (
-                            <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-white text-2xl font-bold">
-                              +{post.mediaURLs!.length - 4}
-                            </div>
-                          )}
+                          <div className="absolute bottom-2 right-2 text-white/20 font-semibold text-sm pointer-events-none select-none">
+                            Africa Genius Alliance
+                          </div>
                         </div>
-                      ))}
+                      ) : (
+                        <div className="grid grid-cols-2 gap-0.5">
+                          {post.mediaURLs.slice(0, 4).map((url, index) => (
+                            <div key={index} className="relative">
+                              <img
+                                src={`${process.env.NEXT_PUBLIC_API_URL || 'https://africageniusalliance.com'}${url}`}
+                                alt={`Post image ${index + 1}`}
+                                className="w-full h-32 object-cover"
+                              />
+                              {index === 3 && post.mediaURLs!.length > 4 && (
+                                <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-white text-lg font-bold">
+                                  +{post.mediaURLs!.length - 4}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
-                </div>
-              )}
 
-              {/* Post Actions */}
-              <div className="flex items-center gap-6 pt-4 border-t border-gray-200">
-                <button
-                  onClick={() => handleLike(post._id)}
-                  className={`flex items-center gap-2 ${
-                    post.likedBy.includes(user?._id || '') ? 'text-red-500' : 'text-text-gray'
-                  } hover:text-red-500 transition-colors`}
-                >
-                  <Heart className={`w-5 h-5 ${post.likedBy.includes(user?._id || '') ? 'fill-current' : ''}`} />
-                  <span className="text-sm font-medium">{post.likesCount}</span>
-                </button>
-                <Link href={`/post/${post._id}`} className="flex items-center gap-2 text-text-gray hover:text-primary transition-colors">
-                  <MessageCircle className="w-5 h-5" />
-                  <span className="text-sm font-medium">{post.commentsCount}</span>
-                </Link>
-                <div className="flex items-center gap-2">
-                  <ShareMenu
-                    postId={post._id}
-                    postContent={post.content}
-                    authorName={post.authorName}
-                  />
-                  <span className="text-sm font-medium text-text-gray">{post.sharesCount}</span>
+                  {/* Post Actions - Compact Twitter-style */}
+                  <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                    <button
+                      onClick={() => handleLike(post._id)}
+                      className={`flex items-center gap-1.5 px-2 py-1 rounded-full transition-colors ${
+                        post.likedBy.includes(user?._id || '')
+                          ? 'text-red-500 bg-red-50'
+                          : 'text-text-gray hover:text-red-500 hover:bg-red-50'
+                      }`}
+                    >
+                      <Heart className={`w-4 h-4 ${post.likedBy.includes(user?._id || '') ? 'fill-current' : ''}`} />
+                      <span className="text-xs font-medium">{post.likesCount}</span>
+                    </button>
+                    <Link
+                      href={`/post/${post._id}`}
+                      className="flex items-center gap-1.5 px-2 py-1 rounded-full text-text-gray hover:text-primary hover:bg-primary/10 transition-colors"
+                    >
+                      <MessageCircle className="w-4 h-4" />
+                      <span className="text-xs font-medium">{post.commentsCount}</span>
+                    </Link>
+                    <div className="flex items-center gap-1.5 px-2 py-1 rounded-full text-text-gray hover:text-green-500 hover:bg-green-50 transition-colors">
+                      <ShareMenu
+                        postId={post._id}
+                        postContent={post.content}
+                        authorName={post.authorName}
+                      />
+                      <span className="text-xs font-medium">{post.sharesCount}</span>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </AGACard>
-          ))}
-        </div>
-
-        {feedPosts.length > 0 && (
-          <div className="mt-6 text-center">
-            <AGAButton variant="outline" onClick={handleLoadMore} loading={loadingMore}>
-              {loadingMore ? 'Loading...' : 'Load More Posts'}
-            </AGAButton>
+            ))}
           </div>
-        )}
+
+          {feedPosts.length > 0 && (
+            <div className="mt-6 text-center">
+              <AGAButton variant="outline" onClick={handleLoadMore} loading={loadingMore}>
+                {loadingMore ? 'Loading...' : 'Load More Posts'}
+              </AGAButton>
+            </div>
+          )}
+        </div>
       </section>
     </div>
   );

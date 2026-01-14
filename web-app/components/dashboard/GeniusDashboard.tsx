@@ -513,15 +513,16 @@ export function GeniusDashboard() {
       )}
 
       {/* Feed Section */}
-      <section>
-        <h2 className="text-2xl font-bold text-text-dark mb-4">Your Feed</h2>
+      <section className="max-w-xl">
+        <h2 className="text-xl font-bold text-text-dark mb-4">Your Feed</h2>
 
-        {/* Feed Filter Tabs */}
-        <AGACard variant="elevated" padding="sm" className="mb-6">
-          <div className="flex gap-2">
+        {/* Compact Twitter-style feed container */}
+        <div>
+          {/* Feed Filter Tabs */}
+          <div className="flex gap-2 mb-4">
             <button
               onClick={() => setFeedView('own')}
-              className={`px-6 py-3 rounded-aga font-medium transition-colors ${
+              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
                 feedView === 'own'
                   ? 'bg-primary text-white'
                   : 'bg-gray-100 text-text-gray hover:bg-gray-200'
@@ -531,7 +532,7 @@ export function GeniusDashboard() {
             </button>
             <button
               onClick={() => setFeedView('all')}
-              className={`px-6 py-3 rounded-aga font-medium transition-colors ${
+              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
                 feedView === 'all'
                   ? 'bg-primary text-white'
                   : 'bg-gray-100 text-text-gray hover:bg-gray-200'
@@ -540,107 +541,129 @@ export function GeniusDashboard() {
               All Posts
             </button>
           </div>
-        </AGACard>
 
-        {/* Feed Posts */}
-        {feedLoading ? (
-          <div className="flex justify-center py-12">
-            <Loader2 className="w-8 h-8 text-primary animate-spin" />
-          </div>
-        ) : feedPosts.length === 0 ? (
-          <AGACard variant="elevated" padding="lg">
-            <div className="text-center py-12">
-              <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-bold text-text-dark mb-2">
+          {/* Feed Posts */}
+          {feedLoading ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="w-8 h-8 text-primary animate-spin" />
+            </div>
+          ) : feedPosts.length === 0 ? (
+            <div className="bg-white rounded-xl border border-gray-100 p-8 text-center">
+              <FileText className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+              <h3 className="text-base font-bold text-text-dark mb-2">
                 {feedView === 'own' ? 'No posts yet' : 'No posts available'}
               </h3>
-              <p className="text-text-gray mb-6">
+              <p className="text-text-gray text-sm mb-4">
                 {feedView === 'own'
                   ? 'Share your first update with your supporters!'
                   : 'Check back later for new posts from the community'}
               </p>
               {feedView === 'own' && (
                 <Link href="/create?tab=post">
-                  <AGAButton variant="primary">
+                  <AGAButton variant="primary" size="sm">
                     Create Your First Post
                   </AGAButton>
                 </Link>
               )}
             </div>
-          </AGACard>
-        ) : (
-          <div className="space-y-4">
-            {feedPosts.map((post) => (
-              <AGACard key={post._id} variant="elevated" padding="lg" hoverable>
-                {/* Post Header */}
-                <div className="flex items-start gap-4 mb-4">
-                  <div className="w-12 h-12 rounded-full bg-gradient-accent flex items-center justify-center text-white font-bold flex-shrink-0">
-                    {post.authorName?.charAt(0).toUpperCase() || 'A'}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-bold text-text-dark">{post.authorName}</h3>
-                    <p className="text-sm text-text-gray">{post.authorPosition}</p>
-                    <p className="text-xs text-text-gray mt-1">
-                      {new Date(post.createdAt).toLocaleDateString('en-US', {
-                        year: 'numeric',
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })}
+          ) : (
+            <div className="space-y-4">
+              {feedPosts.map((post) => (
+                <div
+                  key={post._id}
+                  className="bg-white rounded-xl border border-gray-100 transition-all hover:bg-gray-50"
+                >
+                  <div className="p-4">
+                    {/* Post Header - Compact */}
+                    <div className="flex items-start gap-3 mb-3">
+                      <div className="w-10 h-10 rounded-full bg-gradient-accent flex items-center justify-center text-white font-semibold text-sm flex-shrink-0">
+                        {post.authorName?.charAt(0).toUpperCase() || 'A'}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <h3 className="font-semibold text-text-dark text-sm">{post.authorName}</h3>
+                          <span className="text-text-gray text-xs">·</span>
+                          <span className="text-text-gray text-xs">{post.authorPosition}</span>
+                          <span className="text-text-gray text-xs">·</span>
+                          <span className="text-text-gray text-xs">
+                            {new Date(post.createdAt).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric'
+                            })}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Post Content - Compact */}
+                    <p className="text-text-dark text-sm mb-3 whitespace-pre-wrap leading-relaxed">
+                      {post.content}
                     </p>
+
+                    {/* Post Images - Compact */}
+                    {post.mediaURLs && post.mediaURLs.length > 0 && (
+                      <div className="mb-3 rounded-xl overflow-hidden border border-gray-100">
+                        {post.mediaURLs.length === 1 ? (
+                          <img
+                            src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}${post.mediaURLs[0]}`}
+                            alt="Post media"
+                            className="w-full h-auto max-h-[200px] object-cover"
+                          />
+                        ) : (
+                          <div className="grid grid-cols-2 gap-0.5">
+                            {post.mediaURLs.slice(0, 4).map((url, index) => (
+                              <div key={index} className="relative">
+                                <img
+                                  src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}${url}`}
+                                  alt={`Post media ${index + 1}`}
+                                  className="w-full h-24 object-cover"
+                                />
+                                {index === 3 && post.mediaURLs!.length > 4 && (
+                                  <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-white text-sm font-bold">
+                                    +{post.mediaURLs!.length - 4}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Post Actions - Compact Twitter-style */}
+                    <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                      <button
+                        onClick={() => handleLike(post._id)}
+                        className={`flex items-center gap-1.5 px-2 py-1 rounded-full transition-colors ${
+                          post.likedBy.includes(user?._id || '')
+                            ? 'text-red-500 bg-red-50'
+                            : 'text-text-gray hover:text-red-500 hover:bg-red-50'
+                        }`}
+                      >
+                        <Heart
+                          className={`w-4 h-4 ${post.likedBy.includes(user?._id || '') ? 'fill-current' : ''}`}
+                        />
+                        <span className="text-xs font-medium">{post.likesCount}</span>
+                      </button>
+                      <button className="flex items-center gap-1.5 px-2 py-1 rounded-full text-text-gray hover:text-primary hover:bg-primary/10 transition-colors">
+                        <MessageCircle className="w-4 h-4" />
+                        <span className="text-xs font-medium">{post.commentsCount}</span>
+                      </button>
+                      <div className="flex items-center gap-1.5 px-2 py-1 rounded-full text-text-gray hover:text-green-500 hover:bg-green-50 transition-colors">
+                        <ShareMenu
+                          postId={post._id}
+                          postContent={post.content}
+                          authorName={post.authorName}
+                        />
+                        <span className="text-xs font-medium">{post.sharesCount}</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
-
-                {/* Post Content */}
-                <p className="text-text-dark mb-4 whitespace-pre-wrap">{post.content}</p>
-
-                {/* Post Images */}
-                {post.mediaURLs && post.mediaURLs.length > 0 && (
-                  <div className={`grid gap-2 mb-4 ${post.mediaURLs.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                    {post.mediaURLs.map((url, index) => (
-                      <img
-                        key={index}
-                        src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}${url}`}
-                        alt={`Post media ${index + 1}`}
-                        className="w-full h-64 object-cover rounded-aga"
-                      />
-                    ))}
-                  </div>
-                )}
-
-                {/* Engagement Stats & Actions */}
-                <div className="flex items-center gap-6 pt-4 border-t border-gray-100">
-                  <button
-                    onClick={() => handleLike(post._id)}
-                    className={`flex items-center gap-2 transition-colors ${
-                      post.likedBy.includes(user?._id || '')
-                        ? 'text-red-500'
-                        : 'text-text-gray hover:text-red-500'
-                    }`}
-                  >
-                    <Heart
-                      className={`w-5 h-5 ${post.likedBy.includes(user?._id || '') ? 'fill-current' : ''}`}
-                    />
-                    <span className="text-sm font-medium">{post.likesCount}</span>
-                  </button>
-                  <button className="flex items-center gap-2 text-text-gray hover:text-primary transition-colors">
-                    <MessageCircle className="w-5 h-5" />
-                    <span className="text-sm font-medium">{post.commentsCount}</span>
-                  </button>
-                  <div className="flex items-center gap-2">
-                    <ShareMenu
-                      postId={post._id}
-                      postContent={post.content}
-                      authorName={post.authorName}
-                    />
-                    <span className="text-sm font-medium text-text-gray">{post.sharesCount}</span>
-                  </div>
-                </div>
-              </AGACard>
-            ))}
-          </div>
-        )}
+              ))}
+            </div>
+          )}
+        </div>
       </section>
     </div>
   );

@@ -4,14 +4,43 @@ const Donation = require('../models/Donation');
 const User = require('../models/User');
 const Project = require('../models/Project');
 const crypto = require('crypto');
+const blockchainService = require('../services/blockchainService');
 
 // POST /api/funding/donate - Make a donation
 router.post('/donate', async (req, res) => {
     try {
-        const { donorId, donorName, recipientId, recipientType, amount, currency, message, isAnonymous, paymentMethod } = req.body;
-        
+        const { donorId, donorName, recipientId, recipientType, amount, currency, message, isAnonymous, paymentMethod, paymentToken } = req.body;
+
         const donationId = crypto.randomBytes(16).toString('hex');
-        
+
+        // Process blockchain donation if payment method is crypto
+        let blockchainTxHash = null;
+        let blockchainDonationId = null;
+        let actualPaymentToken = paymentToken || 'USDT'; // Default to USDT
+
+        if (paymentMethod === 'crypto' && recipientType === 'genius') {
+            try {
+                console.log(`Processing blockchain donation for genius: ${recipientId} with ${actualPaymentToken}`);
+                const blockchainResult = await blockchainService.processDonation(
+                    recipientId,
+                    amount,
+                    message || '',
+                    isAnonymous || false,
+                    actualPaymentToken
+                );
+
+                if (blockchainResult.success) {
+                    blockchainTxHash = blockchainResult.transactionHash;
+                    blockchainDonationId = blockchainResult.donationId;
+                    console.log('Blockchain donation successful:', blockchainTxHash);
+                    console.log(`Funds automatically forwarded to admin wallet in ${actualPaymentToken}`);
+                }
+            } catch (blockchainError) {
+                console.error('Blockchain donation failed, falling back to database only:', blockchainError.message);
+                // Continue with database record even if blockchain fails
+            }
+        }
+
         const donation = new Donation({
             donationId,
             donorId,
@@ -23,10 +52,11 @@ router.post('/donate', async (req, res) => {
             message,
             isAnonymous,
             paymentMethod: paymentMethod || 'card',
-            paymentStatus: 'completed'
+            paymentStatus: 'completed',
+            transactionId: blockchainTxHash || donationId // Use blockchain tx hash if available
         });
         await donation.save();
-        
+
         // Update recipient stats
         if (recipientType === 'genius') {
             await User.findOneAndUpdate(
@@ -39,14 +69,23 @@ router.post('/donate', async (req, res) => {
                 { $inc: { fundingRaised: amount, supportersCount: 1 } }
             );
         }
-        
+
         // Update donor stats
         await User.findOneAndUpdate(
             { userId: donorId },
             { $inc: { donationsTotal: amount } }
         );
-        
-        res.status(201).json({ success: true, data: donation });
+
+        res.status(201).json({
+            success: true,
+            data: donation,
+            blockchain: blockchainTxHash ? {
+                transactionHash: blockchainTxHash,
+                donationId: blockchainDonationId,
+                forwardedToAdmin: true,
+                explorer: blockchainService.getExplorerUrl(blockchainTxHash)
+            } : null
+        });
     } catch (error) {
         console.error('Donation error:', error);
         res.status(500).json({ success: false, error: error.message });

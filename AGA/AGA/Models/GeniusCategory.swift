@@ -162,6 +162,7 @@ struct GeniusOnboardingData {
     var position: GeniusPosition?
     var customRole: String = ""  // For custom non-electoral roles
     var sector: String = ""      // Sector specialization (e.g., "Energy Sector")
+    var location: String = ""    // Geographic location (e.g., "Ogun State", "Lagos", "Ward 3")
     var biography: String = ""
     var whyGenius: String = ""
     var problemSolved: String = ""
@@ -174,15 +175,27 @@ struct GeniusOnboardingData {
     // Computed property for display title
     var positionTitle: String {
         if let position = position {
+            var title = position.title
+            // Add location for electoral positions
+            if position.isElectoral && !location.isEmpty {
+                title += " for \(location)"
+            }
+            // Add sector if available
             if let sector = position.sector {
-                return "\(position.title) – \(sector)"
+                title += " – \(sector)"
             }
-            return position.title
+            return title
         } else if !customRole.isEmpty {
-            if !sector.isEmpty {
-                return "\(customRole) – \(sector)"
+            var title = customRole
+            // Add location if specified
+            if !location.isEmpty {
+                title += " for \(location)"
             }
-            return customRole
+            // Add sector if available
+            if !sector.isEmpty {
+                title += " – \(sector)"
+            }
+            return title
         }
         return ""
     }

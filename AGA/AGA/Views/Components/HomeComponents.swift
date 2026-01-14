@@ -181,6 +181,9 @@ struct GeniusCardSmall: View {
     var onVote: () -> Void = {}
 
     private var followManager: FollowManager { FollowManager.shared }
+    @State private var isPressed = false
+    @State private var followButtonScale: CGFloat = 1.0
+    @State private var voteButtonScale: CGFloat = 1.0
 
     private var isFollowing: Bool {
         followManager.isFollowing(genius.id)
@@ -192,7 +195,7 @@ struct GeniusCardSmall: View {
 
     var body: some View {
         VStack(spacing: 10) {
-            // Avatar
+            // Avatar with subtle hover effect
             ZStack(alignment: .bottomTrailing) {
                 if let avatarURL = genius.avatarURL, !avatarURL.isEmpty {
                     Image(avatarURL)
@@ -218,6 +221,8 @@ struct GeniusCardSmall: View {
                         .background(Circle().fill(.white).frame(width: 18, height: 18))
                 }
             }
+            .scaleEffect(isPressed ? 0.95 : 1.0)
+            .animation(FluidAnimation.snappy, value: isPressed)
 
             VStack(spacing: 2) {
                 Text(genius.name)
@@ -245,7 +250,18 @@ struct GeniusCardSmall: View {
             }
 
             HStack(spacing: 6) {
-                Button(action: onFollow) {
+                Button(action: {
+                    HapticFeedback.impact(.light)
+                    withAnimation(FluidAnimation.bouncy) {
+                        followButtonScale = 0.9
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        withAnimation(FluidAnimation.smooth) {
+                            followButtonScale = 1.0
+                        }
+                    }
+                    onFollow()
+                }) {
                     if isLoadingFollow {
                         ProgressView()
                             .scaleEffect(0.7)
@@ -260,9 +276,21 @@ struct GeniusCardSmall: View {
                             .cornerRadius(12)
                     }
                 }
+                .scaleEffect(followButtonScale)
                 .disabled(isLoadingFollow)
 
-                Button(action: onVote) {
+                Button(action: {
+                    HapticFeedback.impact(.medium)
+                    withAnimation(FluidAnimation.bouncy) {
+                        voteButtonScale = 0.9
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        withAnimation(FluidAnimation.smooth) {
+                            voteButtonScale = 1.0
+                        }
+                    }
+                    onVote()
+                }) {
                     Text("Vote")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundColor(Color(hex: "f59e0b"))
@@ -271,14 +299,29 @@ struct GeniusCardSmall: View {
                         .background(Color(hex: "f59e0b").opacity(0.15))
                         .cornerRadius(12)
                 }
+                .scaleEffect(voteButtonScale)
             }
         }
         .padding(12)
         .frame(width: 140)
         .background(Color.white)
         .cornerRadius(16)
-        .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 4)
-        .onTapGesture { onTap() }
+        .shadow(color: .black.opacity(isPressed ? 0.08 : 0.05), radius: isPressed ? 6 : 10, x: 0, y: isPressed ? 2 : 4)
+        .scaleEffect(isPressed ? 0.97 : 1.0)
+        .animation(FluidAnimation.snappy, value: isPressed)
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in
+                    if !isPressed {
+                        isPressed = true
+                        HapticFeedback.impact(.light)
+                    }
+                }
+                .onEnded { _ in
+                    isPressed = false
+                    onTap()
+                }
+        )
     }
 }
 
@@ -337,9 +380,13 @@ struct QuickActionPill: View {
     let icon: String?
     let isActive: Bool
     let action: () -> Void
+    @State private var isPressed = false
 
     var body: some View {
-        Button(action: action) {
+        Button(action: {
+            HapticFeedback.selection()
+            action()
+        }) {
             HStack(spacing: 6) {
                 if let icon = icon {
                     Image(systemName: icon)
@@ -353,8 +400,16 @@ struct QuickActionPill: View {
             .padding(.vertical, 8)
             .background(isActive ? Color(hex: "10b981") : Color(hex: "f3f4f6"))
             .cornerRadius(20)
+            .scaleEffect(isPressed ? 0.94 : 1.0)
+            .animation(FluidAnimation.snappy, value: isPressed)
+            .animation(FluidAnimation.smooth, value: isActive)
         }
         .buttonStyle(PlainButtonStyle())
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in isPressed = true }
+                .onEnded { _ in isPressed = false }
+        )
     }
 }
 
@@ -362,17 +417,32 @@ struct QuickActionPill: View {
 struct CategoryGridItem: View {
     let category: CategoryItem
     let action: () -> Void
+    @State private var isPressed = false
+    @State private var iconScale: CGFloat = 1.0
 
     var body: some View {
-        Button(action: action) {
+        Button(action: {
+            HapticFeedback.impact(.light)
+            withAnimation(FluidAnimation.bouncy) {
+                iconScale = 1.2
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                withAnimation(FluidAnimation.smooth) {
+                    iconScale = 1.0
+                }
+            }
+            action()
+        }) {
             VStack(spacing: 8) {
                 ZStack {
                     Circle()
-                        .fill(Color(hex: category.color).opacity(0.15))
+                        .fill(Color(hex: category.color).opacity(isPressed ? 0.25 : 0.15))
                         .frame(width: 44, height: 44)
+                        .animation(FluidAnimation.snappy, value: isPressed)
                     Image(systemName: category.icon)
                         .font(.system(size: 18))
                         .foregroundColor(Color(hex: category.color))
+                        .scaleEffect(iconScale)
                 }
 
                 Text(category.name)
@@ -383,9 +453,16 @@ struct CategoryGridItem: View {
             .padding(.vertical, 12)
             .background(Color.white)
             .cornerRadius(12)
-            .shadow(color: .black.opacity(0.03), radius: 4, x: 0, y: 2)
+            .shadow(color: .black.opacity(isPressed ? 0.06 : 0.03), radius: isPressed ? 2 : 4, x: 0, y: isPressed ? 1 : 2)
+            .scaleEffect(isPressed ? 0.95 : 1.0)
+            .animation(FluidAnimation.snappy, value: isPressed)
         }
         .buttonStyle(PlainButtonStyle())
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in isPressed = true }
+                .onEnded { _ in isPressed = false }
+        )
     }
 }
 

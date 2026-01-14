@@ -2,35 +2,41 @@
 
 import { useState } from 'react';
 import { AGACard, AGAButton, AGAPill } from '@/components/ui';
-import { X, Vote, CheckCircle, AlertCircle } from 'lucide-react';
+import { X, Vote, CheckCircle, AlertCircle, ExternalLink, Link as LinkIcon } from 'lucide-react';
 import { votingAPI } from '@/lib/api';
+import { Election, ElectionCandidate } from '@/types';
+import { useAuth } from '@/lib/auth/AuthContext';
 
 interface VotingModalProps {
-  election: any;
+  election: Election;
   onClose: () => void;
 }
 
 export function VotingModal({ election, onClose }: VotingModalProps) {
-  const [votes, setVotes] = useState<{ [key: string]: number }>({});
+  const { user } = useAuth();
+  const [selectedCandidate, setSelectedCandidate] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const [transactionHash, setTransactionHash] = useState<string | null>(null);
+  const [voteResult, setVoteResult] = useState<{
+    transactionHash: string;
+    blockNumber: number;
+    candidateName: string;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const handleVoteChange = (candidateId: string, value: number) => {
-    setVotes((prev) => ({
-      ...prev,
-      [candidateId]: value,
-    }));
+  const handleSelectCandidate = (candidateId: string) => {
+    setSelectedCandidate(candidateId);
     setError(null);
   };
 
-  const totalVotes = Object.values(votes).reduce((sum, v) => sum + v, 0);
-  const hasVoted = totalVotes > 0;
-
   const handleSubmit = async () => {
-    if (!hasVoted) {
-      setError('Please cast at least one vote');
+    if (!selectedCandidate) {
+      setError('Please select a candidate to vote for');
+      return;
+    }
+
+    if (!user?.userId) {
+      setError('You must be logged in to vote');
       return;
     }
 
@@ -38,31 +44,35 @@ export function VotingModal({ election, onClose }: VotingModalProps) {
     setError(null);
 
     try {
-      // Submit votes for each candidate
-      const votePromises = Object.entries(votes)
-        .filter(([_, weight]) => weight > 0)
-        .map(([candidateId, weight]) =>
-          votingAPI.castVote({
-            targetGeniusId: candidateId,
-            positionId: election._id,
-            weight,
-          })
-        );
+      const response = await votingAPI.castVote(election.electionId, {
+        userId: user.userId,
+        candidateId: selectedCandidate,
+      });
 
-      const results = await Promise.all(votePromises);
-
-      // Get transaction hash from first vote (in real app, would be from blockchain)
-      const mockHash = `0x${Math.random().toString(16).substring(2, 42)}`;
-      setTransactionHash(mockHash);
-      setSubmitted(true);
+      if (response.success && response.data) {
+        const candidate = election.candidates.find(c => c.candidateId === selectedCandidate);
+        setVoteResult({
+          transactionHash: response.data.vote.blockchain.transactionHash,
+          blockNumber: response.data.vote.blockchain.blockNumber,
+          candidateName: candidate?.name || 'Unknown',
+        });
+        setSubmitted(true);
+      } else {
+        setError(response.error || 'Failed to submit vote');
+      }
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to submit votes');
+      setError(err.response?.data?.error || err.message || 'Failed to submit vote');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  if (submitted) {
+  // Get initials for avatar
+  const getInitials = (name: string) => {
+    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  };
+
+  if (submitted && voteResult) {
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
         <AGACard variant="elevated" padding="lg" className="max-w-lg w-full">
@@ -73,20 +83,32 @@ export function VotingModal({ election, onClose }: VotingModalProps) {
             <h2 className="text-3xl font-black text-text-dark mb-2">
               Vote Confirmed!
             </h2>
-            <p className="text-text-gray mb-6">
-              Your {totalVotes} vote{totalVotes > 1 ? 's' : ''} ha{totalVotes > 1 ? 've' : 's'} been successfully recorded on the blockchain.
+            <p className="text-text-gray mb-2">
+              Your vote for <span className="font-semibold text-text-dark">{voteResult.candidateName}</span> has been recorded.
+            </p>
+            <p className="text-sm text-text-gray mb-6">
+              Block #{voteResult.blockNumber} • Verified on BNB Chain
             </p>
 
-            {transactionHash && (
-              <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-                <p className="text-sm font-semibold text-text-dark mb-2">
-                  Transaction Hash
-                </p>
-                <code className="text-xs text-primary break-all">
-                  {transactionHash}
+            <div className="mb-6 p-4 bg-gray-50 rounded-lg text-left">
+              <p className="text-sm font-semibold text-text-dark mb-2 flex items-center gap-2">
+                <LinkIcon className="w-4 h-4" />
+                Transaction Hash
+              </p>
+              <div className="flex items-center gap-2">
+                <code className="text-xs text-primary break-all flex-1">
+                  {voteResult.transactionHash}
                 </code>
+                <a
+                  href={`https://testnet.bscscan.com/tx/${voteResult.transactionHash}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:text-primary/80 flex-shrink-0"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                </a>
               </div>
-            )}
+            </div>
 
             <AGAButton variant="primary" fullWidth onClick={onClose}>
               Done
@@ -105,11 +127,17 @@ export function VotingModal({ election, onClose }: VotingModalProps) {
           <div className="flex items-start justify-between mb-6">
             <div>
               <h2 className="text-3xl font-black text-text-dark mb-2">
-                {election.electionName}
+                {election.title}
               </h2>
               <p className="text-text-gray">
-                Vote for your preferred candidates (1-4 votes per candidate)
+                Select one candidate to cast your vote
               </p>
+              {election.blockchain?.isDeployed && (
+                <div className="flex items-center gap-1 mt-2 text-xs text-green-600">
+                  <LinkIcon className="w-3 h-3" />
+                  Votes recorded on BNB Chain
+                </div>
+              )}
             </div>
             <button
               onClick={onClose}
@@ -129,101 +157,80 @@ export function VotingModal({ election, onClose }: VotingModalProps) {
 
           {/* Voting Info */}
           <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-aga">
-            <h3 className="font-semibold text-blue-900 mb-2">How to Vote</h3>
+            <h3 className="font-semibold text-blue-900 mb-2">Classic Voting</h3>
             <ul className="text-sm text-blue-700 space-y-1">
-              <li>• Each candidate can receive 1-4 votes from you</li>
-              <li>• You can vote for multiple candidates</li>
-              <li>• Your votes will be recorded on the blockchain</li>
+              <li>• Select <strong>one candidate</strong> to vote for</li>
+              <li>• Your vote will be recorded on the blockchain</li>
               <li>• You can only vote once per election</li>
+              <li>• Votes are final and cannot be changed</li>
             </ul>
           </div>
 
-          {/* Candidates */}
+          {/* Candidates - Radio Selection */}
           <div className="space-y-4 mb-6">
-            {election.candidates.map((candidate: any) => {
-              const candidateVotes = votes[candidate.userId] || 0;
+            {election.candidates
+              .sort((a, b) => b.votesReceived - a.votesReceived)
+              .map((candidate: ElectionCandidate) => {
+              const isSelected = selectedCandidate === candidate.candidateId;
 
               return (
-                <div
-                  key={candidate.userId}
-                  className={`p-6 rounded-aga border-2 transition-all ${
-                    candidateVotes > 0
-                      ? 'border-primary bg-primary/5'
-                      : 'border-gray-200 bg-white'
+                <button
+                  key={candidate.candidateId}
+                  onClick={() => handleSelectCandidate(candidate.candidateId)}
+                  className={`w-full p-6 rounded-aga border-2 transition-all text-left ${
+                    isSelected
+                      ? 'border-primary bg-primary/5 ring-2 ring-primary/20'
+                      : 'border-gray-200 bg-white hover:border-gray-300'
                   }`}
                 >
-                  <div className="flex items-start gap-4 mb-4">
+                  <div className="flex items-start gap-4">
+                    {/* Selection Indicator */}
+                    <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-1 ${
+                      isSelected ? 'border-primary bg-primary' : 'border-gray-300'
+                    }`}>
+                      {isSelected && <CheckCircle className="w-4 h-4 text-white" />}
+                    </div>
+
                     {/* Avatar */}
                     <div className="w-16 h-16 rounded-full bg-gradient-accent flex items-center justify-center text-white font-bold text-xl flex-shrink-0">
-                      {candidate.avatar}
+                      {candidate.avatarURL ? (
+                        <img src={candidate.avatarURL} alt={candidate.name} className="w-full h-full rounded-full object-cover" />
+                      ) : (
+                        getInitials(candidate.name)
+                      )}
                     </div>
 
                     {/* Info */}
-                    <div className="flex-1">
+                    <div className="flex-1 min-w-0">
                       <h3 className="text-xl font-bold text-text-dark mb-1">
                         {candidate.name}
                       </h3>
-                      <p className="text-sm text-text-gray mb-2">
-                        {candidate.position}
-                      </p>
-                      <AGAPill variant="primary" size="sm">
-                        {candidate.category}
-                      </AGAPill>
+                      {candidate.party && (
+                        <AGAPill variant="primary" size="sm" className="mb-2">
+                          {candidate.party}
+                        </AGAPill>
+                      )}
+                      {candidate.bio && (
+                        <p className="text-sm text-text-gray mb-2">
+                          {candidate.bio}
+                        </p>
+                      )}
+                      {candidate.manifesto && (
+                        <p className="text-sm text-text-gray italic">
+                          "{candidate.manifesto}"
+                        </p>
+                      )}
                     </div>
 
                     {/* Current Votes */}
-                    <div className="text-right">
+                    <div className="text-right flex-shrink-0">
                       <div className="text-2xl font-black text-text-dark">
-                        {candidate.votes.toLocaleString()}
+                        {candidate.votesReceived.toLocaleString()}
                       </div>
-                      <div className="text-xs text-text-gray">current votes</div>
+                      <div className="text-xs text-text-gray">votes</div>
                     </div>
                   </div>
-
-                  {/* Manifesto */}
-                  <p className="text-sm text-text-gray mb-4">
-                    {candidate.manifesto}
-                  </p>
-
-                  {/* Vote Slider */}
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="text-sm font-semibold text-text-dark">
-                        Your Votes
-                      </label>
-                      <span className="text-lg font-bold text-primary">
-                        {candidateVotes} vote{candidateVotes !== 1 ? 's' : ''}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="range"
-                        min="0"
-                        max="4"
-                        value={candidateVotes}
-                        onChange={(e) =>
-                          handleVoteChange(candidate.userId, parseInt(e.target.value))
-                        }
-                        className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary"
-                      />
-                      <div className="flex gap-1">
-                        {[0, 1, 2, 3, 4].map((num) => (
-                          <button
-                            key={num}
-                            onClick={() => handleVoteChange(candidate.userId, num)}
-                            className={`w-10 h-10 rounded-lg font-bold transition-all ${
-                              candidateVotes === num
-                                ? 'bg-primary text-white'
-                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                            }`}
-                          >
-                            {num}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                </button>
               );
             })}
           </div>
@@ -231,10 +238,16 @@ export function VotingModal({ election, onClose }: VotingModalProps) {
           {/* Summary & Submit */}
           <div className="flex items-center justify-between pt-6 border-t border-gray-200">
             <div>
-              <p className="text-sm text-text-gray mb-1">Total Votes to Cast</p>
-              <p className="text-3xl font-black text-text-dark">
-                {totalVotes} vote{totalVotes !== 1 ? 's' : ''}
-              </p>
+              {selectedCandidate ? (
+                <>
+                  <p className="text-sm text-text-gray mb-1">Selected Candidate</p>
+                  <p className="text-lg font-bold text-text-dark">
+                    {election.candidates.find(c => c.candidateId === selectedCandidate)?.name}
+                  </p>
+                </>
+              ) : (
+                <p className="text-text-gray">Select a candidate to vote</p>
+              )}
             </div>
 
             <div className="flex gap-3">
@@ -246,10 +259,10 @@ export function VotingModal({ election, onClose }: VotingModalProps) {
                 size="lg"
                 onClick={handleSubmit}
                 loading={isSubmitting}
-                disabled={!hasVoted}
+                disabled={!selectedCandidate}
                 leftIcon={<Vote className="w-5 h-5" />}
               >
-                Submit Votes
+                Cast Vote
               </AGAButton>
             </div>
           </div>

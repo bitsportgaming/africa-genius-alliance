@@ -189,9 +189,18 @@ struct TimelinePostCard: View {
                     )
                 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(post.authorName)
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(Color(hex: "1f2937"))
+                    HStack(spacing: 6) {
+                        Text(post.authorName)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(Color(hex: "1f2937"))
+
+                        // Gold checkmark for admin posts
+                        if post.shouldShowAdminBadge {
+                            Image(systemName: "checkmark.seal.fill")
+                                .font(.system(size: 12))
+                                .foregroundColor(Color(hex: "FFD700"))
+                        }
+                    }
                     Text(post.authorPosition ?? "Member")
                         .font(.system(size: 12))
                         .foregroundColor(Color(hex: "6b7280"))
@@ -208,13 +217,38 @@ struct TimelinePostCard: View {
             Text(post.content)
                 .font(.system(size: 15))
                 .foregroundColor(Color(hex: "374151"))
-                .lineLimit(nil)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
             
             // Media
             if let mediaURLs = post.mediaURLs, !mediaURLs.isEmpty {
                 mediaSection(urls: mediaURLs, type: post.mediaType ?? "image")
             }
-            
+
+            // Declaration footer for official posts
+            if post.hasDeclaration, let declaration = post.declaration {
+                VStack(alignment: .leading, spacing: 8) {
+                    Divider()
+                        .background(Color(hex: "e5e7eb"))
+
+                    HStack(alignment: .top, spacing: 8) {
+                        Image(systemName: "info.circle.fill")
+                            .font(.system(size: 14))
+                            .foregroundColor(Color(hex: "3b82f6"))
+
+                        Text(declaration)
+                            .font(.system(size: 12))
+                            .foregroundColor(Color(hex: "6b7280"))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(.vertical, 8)
+                    .padding(.horizontal, 12)
+                    .background(Color(hex: "eff6ff"))
+                    .cornerRadius(8)
+                }
+                .padding(.top, 8)
+            }
+
             // Actions
             HStack(spacing: 24) {
                 actionButton(icon: isLiked ? "heart.fill" : "heart", count: likesCount, color: isLiked ? Color(hex: "ef4444") : Color(hex: "6b7280")) {

@@ -13,6 +13,7 @@ struct PositionSelectionStep: View {
     @Binding var selectedPosition: GeniusPosition?
     @Binding var customRole: String
     @Binding var sector: String
+    @Binding var location: String
     let onNext: () -> Void
     let onBack: () -> Void
 
@@ -202,7 +203,7 @@ struct PositionSelectionStep: View {
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundColor(.white)
 
-                        Text("Examples: \"Senator for Ogun State\", \"Mayor of Lagos\", \"Councilor for Ward 3\"")
+                        Text("Examples: \"Senator\", \"Mayor\", \"Councilor\"")
                             .font(.system(size: 12))
                             .foregroundColor(.white.opacity(0.6))
 
@@ -220,6 +221,30 @@ struct PositionSelectionStep: View {
                     .padding(.horizontal, 20)
                     .padding(.top, 8)
                 }
+
+                // Location input for electoral positions
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Geographic Location")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(.white)
+
+                    Text("Specify the state, region, or local government area")
+                        .font(.system(size: 12))
+                        .foregroundColor(.white.opacity(0.6))
+
+                    TextField("e.g., Ogun State, Lagos, Ward 3", text: $location)
+                        .textInputAutocapitalization(.words)
+                        .foregroundColor(.white)
+                        .padding(14)
+                        .background(Color.white.opacity(0.1))
+                        .cornerRadius(12)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(!location.isEmpty ? Color(hex: "f59e0b").opacity(0.5) : Color.white.opacity(0.2), lineWidth: 1)
+                        )
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
             }
         }
     }
@@ -467,6 +492,7 @@ struct SectorPickerSheet: View {
             selectedPosition: .constant(nil),
             customRole: .constant(""),
             sector: .constant(""),
+            location: .constant(""),
             onNext: {},
             onBack: {}
         )

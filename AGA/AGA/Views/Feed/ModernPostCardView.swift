@@ -119,6 +119,8 @@ struct ModernPostCardView: View {
                     .font(.system(size: 15))
                     .foregroundColor(.white.opacity(0.95))
                     .lineSpacing(4)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
                 // Stats row (matching reference)
                 HStack(spacing: 24) {

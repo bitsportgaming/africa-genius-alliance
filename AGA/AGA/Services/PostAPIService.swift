@@ -44,17 +44,28 @@ struct APIPost: Codable, Identifiable {
     let commentsCount: Int
     let sharesCount: Int
     let likedBy: [String]?
+    let isAdminPost: Bool?
+    let authorRole: String?
+    let declaration: String?
     let createdAt: String
     let updatedAt: String
-    
+
     var id: String { _id }
-    
+
+    var shouldShowAdminBadge: Bool {
+        return isAdminPost == true || authorRole == "admin" || authorRole == "superadmin"
+    }
+
+    var hasDeclaration: Bool {
+        return declaration != nil && !(declaration?.isEmpty ?? true)
+    }
+
     var createdDate: Date {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return formatter.date(from: createdAt) ?? Date()
     }
-    
+
     func isLikedBy(userId: String) -> Bool {
         likedBy?.contains(userId) ?? false
     }

@@ -48,6 +48,7 @@ struct GeniusOnboardingView: View {
                             selectedPosition: $onboardingData.position,
                             customRole: $onboardingData.customRole,
                             sector: $onboardingData.sector,
+                            location: $onboardingData.location,
                             onNext: { nextStep() },
                             onBack: { previousStep() }
                         )

@@ -54,6 +54,8 @@ struct PostCardView: View {
             // Content
             Text(post.content)
                 .font(.body)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
             
             // Images (if any) with AGA watermark
             if let imageURLs = post.imageURLs, !imageURLs.isEmpty {

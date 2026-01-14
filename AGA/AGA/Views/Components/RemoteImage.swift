@@ -18,40 +18,44 @@ struct RemoteImage: View {
     @State private var errorText = ""
 
     var body: some View {
-        Group {
-            if let image = image {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-                    .clipped()
-            } else if isLoading {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color(hex: "f3f4f6"))
-                    .overlay(
-                        VStack {
-                            ProgressView()
-                            Text("Loading...")
-                                .font(.system(size: 10))
-                                .foregroundColor(.gray)
-                        }
-                    )
-            } else {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color(hex: "e5e7eb"))
-                    .overlay(
-                        VStack(spacing: 4) {
-                            Image(systemName: "photo")
-                                .font(.system(size: 30))
-                                .foregroundColor(Color(hex: "9ca3af"))
-                            Text(errorText)
-                                .font(.system(size: 8))
-                                .foregroundColor(.red)
-                                .lineLimit(2)
-                                .padding(.horizontal, 4)
-                        }
-                    )
+        GeometryReader { geometry in
+            Group {
+                if let image = image {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: geometry.size.width, height: geometry.size.height)
+                        .clipped()
+                } else if isLoading {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color(hex: "f3f4f6"))
+                        .overlay(
+                            VStack {
+                                ProgressView()
+                                Text("Loading...")
+                                    .font(.system(size: 10))
+                                    .foregroundColor(.gray)
+                            }
+                        )
+                } else {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color(hex: "e5e7eb"))
+                        .overlay(
+                            VStack(spacing: 4) {
+                                Image(systemName: "photo")
+                                    .font(.system(size: 30))
+                                    .foregroundColor(Color(hex: "9ca3af"))
+                                Text(errorText)
+                                    .font(.system(size: 8))
+                                    .foregroundColor(.red)
+                                    .lineLimit(2)
+                                    .padding(.horizontal, 4)
+                            }
+                        )
+                }
             }
         }
+        .clipped()
         .onAppear {
             loadImage()
         }

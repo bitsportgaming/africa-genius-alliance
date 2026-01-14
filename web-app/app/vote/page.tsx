@@ -42,11 +42,12 @@ export default function VotePage() {
   // Fetch user's vote history
   const fetchMyVotes = async () => {
     if (!user?.userId) return;
+    const userId = user.userId;
 
     // Check each election for user's votes
     const votesPromises = elections.map(async (election) => {
       try {
-        const response = await votingAPI.checkVote(election.electionId, user.userId);
+        const response = await votingAPI.checkVote(election.electionId, userId);
         if (response.success && response.data?.hasVoted) {
           const candidate = election.candidates.find(c => c.candidateId === response.data?.vote?.candidateId);
           return {

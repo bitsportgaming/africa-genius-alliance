@@ -20,7 +20,7 @@ export const HeroSection: React.FC = () => {
           {/* Logo */}
           <div className="flex justify-center mb-8">
             <Image
-              src="/aga.png"
+              src="/Aga.png"
               alt="Africa Genius Alliance Logo"
               width={200}
               height={200}

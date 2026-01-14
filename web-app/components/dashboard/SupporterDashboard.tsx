@@ -413,13 +413,12 @@ export function SupporterDashboard() {
               <AGAButton variant="ghost" size="sm">Explore All</AGAButton>
             </Link>
           </div>
-          <div className="flex gap-4 overflow-x-auto pb-4">
+          <div className="flex gap-4 overflow-x-auto pb-4 touch-pan-x">
             {trendingGeniuses.map((genius, index) => (
               <AGACard
                 key={genius.userId || index}
                 variant="elevated"
                 padding="lg"
-                hoverable
                 className="flex-shrink-0 w-72"
               >
                 <div className="text-center">

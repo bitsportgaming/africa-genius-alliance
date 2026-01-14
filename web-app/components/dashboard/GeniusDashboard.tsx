@@ -1,7 +1,7 @@
 'use client';
 
 import { useAuth } from '@/lib/store/auth-store';
-import { AGACard, AGAButton, AGAPill } from '@/components/ui';
+import { AGACard, AGAButton, AGAPill, ShareMenu } from '@/components/ui';
 import Link from 'next/link';
 import {
   TrendingUp,
@@ -17,10 +17,13 @@ import {
   Settings,
   ArrowRight,
   Sparkles,
-  Loader2
+  Loader2,
+  Heart,
+  MessageCircle,
+  Share2
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
-import { apiClient } from '@/lib/api';
+import { useEffect, useState, useCallback } from 'react';
+import { apiClient, postsAPI } from '@/lib/api';
 
 interface UserStats {
   profile: {
@@ -48,11 +51,29 @@ interface UserStats {
   }>;
 }
 
+interface Post {
+  _id: string;
+  authorId: string;
+  authorName: string;
+  authorAvatar?: string;
+  authorPosition?: string;
+  content: string;
+  mediaURLs?: string[];
+  likesCount: number;
+  commentsCount: number;
+  sharesCount: number;
+  likedBy: string[];
+  createdAt: string;
+}
+
 export function GeniusDashboard() {
   const { user } = useAuth();
   const [stats, setStats] = useState<UserStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [feedView, setFeedView] = useState<'own' | 'all'>('own');
+  const [feedPosts, setFeedPosts] = useState<Post[]>([]);
+  const [feedLoading, setFeedLoading] = useState(false);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -78,6 +99,53 @@ export function GeniusDashboard() {
     const interval = setInterval(fetchStats, 5 * 60 * 1000);
     return () => clearInterval(interval);
   }, [user?._id]);
+
+  // Fetch feed posts when feedView changes
+  useEffect(() => {
+    const fetchFeedPosts = async () => {
+      if (!user?._id) return;
+      try {
+        setFeedLoading(true);
+        const params: any = { page: 1, limit: 10 };
+        if (feedView === 'own') {
+          params.userId = user._id;
+          params.feedType = 'own';
+        }
+        const postsResponse = await postsAPI.getPosts(params);
+        if (postsResponse.success && postsResponse.data) {
+          setFeedPosts(Array.isArray(postsResponse.data) ? postsResponse.data : []);
+        }
+      } catch (err) {
+        console.error('Failed to fetch feed posts:', err);
+      } finally {
+        setFeedLoading(false);
+      }
+    };
+    fetchFeedPosts();
+  }, [feedView, user?._id]);
+
+  // Handle like action
+  const handleLike = useCallback(async (postId: string) => {
+    if (!user?._id) return;
+    try {
+      const isLiked = feedPosts.find(p => p._id === postId)?.likedBy.includes(user._id);
+      setFeedPosts(prev => prev.map(post => {
+        if (post._id === postId) {
+          return {
+            ...post,
+            likesCount: isLiked ? post.likesCount - 1 : post.likesCount + 1,
+            likedBy: isLiked
+              ? post.likedBy.filter(id => id !== user._id)
+              : [...post.likedBy, user._id],
+          };
+        }
+        return post;
+      }));
+      await apiClient.post(`/posts/${postId}/like`, { userId: user._id });
+    } catch (err) {
+      console.error('Failed to like post:', err);
+    }
+  }, [user?._id, feedPosts]);
 
   const commandCenterActions = [
     {
@@ -443,6 +511,137 @@ export function GeniusDashboard() {
           </AGACard>
         </section>
       )}
+
+      {/* Feed Section */}
+      <section>
+        <h2 className="text-2xl font-bold text-text-dark mb-4">Your Feed</h2>
+
+        {/* Feed Filter Tabs */}
+        <AGACard variant="elevated" padding="sm" className="mb-6">
+          <div className="flex gap-2">
+            <button
+              onClick={() => setFeedView('own')}
+              className={`px-6 py-3 rounded-aga font-medium transition-colors ${
+                feedView === 'own'
+                  ? 'bg-primary text-white'
+                  : 'bg-gray-100 text-text-gray hover:bg-gray-200'
+              }`}
+            >
+              My Posts
+            </button>
+            <button
+              onClick={() => setFeedView('all')}
+              className={`px-6 py-3 rounded-aga font-medium transition-colors ${
+                feedView === 'all'
+                  ? 'bg-primary text-white'
+                  : 'bg-gray-100 text-text-gray hover:bg-gray-200'
+              }`}
+            >
+              All Posts
+            </button>
+          </div>
+        </AGACard>
+
+        {/* Feed Posts */}
+        {feedLoading ? (
+          <div className="flex justify-center py-12">
+            <Loader2 className="w-8 h-8 text-primary animate-spin" />
+          </div>
+        ) : feedPosts.length === 0 ? (
+          <AGACard variant="elevated" padding="lg">
+            <div className="text-center py-12">
+              <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+              <h3 className="text-lg font-bold text-text-dark mb-2">
+                {feedView === 'own' ? 'No posts yet' : 'No posts available'}
+              </h3>
+              <p className="text-text-gray mb-6">
+                {feedView === 'own'
+                  ? 'Share your first update with your supporters!'
+                  : 'Check back later for new posts from the community'}
+              </p>
+              {feedView === 'own' && (
+                <Link href="/create?tab=post">
+                  <AGAButton variant="primary">
+                    Create Your First Post
+                  </AGAButton>
+                </Link>
+              )}
+            </div>
+          </AGACard>
+        ) : (
+          <div className="space-y-4">
+            {feedPosts.map((post) => (
+              <AGACard key={post._id} variant="elevated" padding="lg" hoverable>
+                {/* Post Header */}
+                <div className="flex items-start gap-4 mb-4">
+                  <div className="w-12 h-12 rounded-full bg-gradient-accent flex items-center justify-center text-white font-bold flex-shrink-0">
+                    {post.authorName?.charAt(0).toUpperCase() || 'A'}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-bold text-text-dark">{post.authorName}</h3>
+                    <p className="text-sm text-text-gray">{post.authorPosition}</p>
+                    <p className="text-xs text-text-gray mt-1">
+                      {new Date(post.createdAt).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Post Content */}
+                <p className="text-text-dark mb-4 whitespace-pre-wrap">{post.content}</p>
+
+                {/* Post Images */}
+                {post.mediaURLs && post.mediaURLs.length > 0 && (
+                  <div className={`grid gap-2 mb-4 ${post.mediaURLs.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                    {post.mediaURLs.map((url, index) => (
+                      <img
+                        key={index}
+                        src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}${url}`}
+                        alt={`Post media ${index + 1}`}
+                        className="w-full h-64 object-cover rounded-aga"
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {/* Engagement Stats & Actions */}
+                <div className="flex items-center gap-6 pt-4 border-t border-gray-100">
+                  <button
+                    onClick={() => handleLike(post._id)}
+                    className={`flex items-center gap-2 transition-colors ${
+                      post.likedBy.includes(user?._id || '')
+                        ? 'text-red-500'
+                        : 'text-text-gray hover:text-red-500'
+                    }`}
+                  >
+                    <Heart
+                      className={`w-5 h-5 ${post.likedBy.includes(user?._id || '') ? 'fill-current' : ''}`}
+                    />
+                    <span className="text-sm font-medium">{post.likesCount}</span>
+                  </button>
+                  <button className="flex items-center gap-2 text-text-gray hover:text-primary transition-colors">
+                    <MessageCircle className="w-5 h-5" />
+                    <span className="text-sm font-medium">{post.commentsCount}</span>
+                  </button>
+                  <div className="flex items-center gap-2">
+                    <ShareMenu
+                      postId={post._id}
+                      postContent={post.content}
+                      authorName={post.authorName}
+                    />
+                    <span className="text-sm font-medium text-text-gray">{post.sharesCount}</span>
+                  </div>
+                </div>
+              </AGACard>
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 }

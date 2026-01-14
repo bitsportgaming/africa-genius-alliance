@@ -217,9 +217,9 @@ struct ModernProfileView: View {
                                     )
                             }
 
-                            // I'm Genius Me button
+                            // Switch Role button
                             Button(action: { showRoleChange = true }) {
-                                Text("I'm Genius Me")
+                                Text("Switch Role")
                                     .font(.system(size: 16, weight: .semibold))
                                     .foregroundColor(.white)
                                     .frame(maxWidth: .infinity)
@@ -248,13 +248,6 @@ struct ModernProfileView: View {
 
                         // Settings section (card style)
                         VStack(spacing: 0) {
-                            #if DEBUG
-                            NavigationLink(destination: DeveloperSettingsView()) {
-                                SettingsRow(icon: "hammer.fill", title: "Developer Settings")
-                            }
-                            Divider()
-                            #endif
-
                             Button(action: { authService.signOut() }) {
                                 SettingsRow(icon: "rectangle.portrait.and.arrow.right", title: "Sign Out", isDestructive: true)
                             }

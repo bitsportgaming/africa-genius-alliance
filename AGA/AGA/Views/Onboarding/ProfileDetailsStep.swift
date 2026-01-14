@@ -203,7 +203,7 @@ struct CountryPickerSheet: View {
                     }) {
                         HStack {
                             Text(country)
-                                .foregroundColor(Color(hex: "1f2937"))
+                                .foregroundColor(.primary)
 
                             Spacer()
 

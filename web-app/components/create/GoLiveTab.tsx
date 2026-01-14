@@ -1,9 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { AGAButton, AGAPill } from '@/components/ui';
-import { Radio, Video, VideoOff, Wifi, AlertCircle } from 'lucide-react';
+import { Radio, Video, VideoOff, Wifi, AlertCircle, Users as UsersIcon } from 'lucide-react';
 import { useAuth } from '@/lib/store/auth-store';
+import { useWebRTC } from '@/lib/webrtc/useWebRTC';
+import { liveAPI } from '@/lib/api';
 
 export function GoLiveTab() {
   const { user } = useAuth();
@@ -11,17 +13,184 @@ export function GoLiveTab() {
   const [description, setDescription] = useState('');
   const [cameraEnabled, setCameraEnabled] = useState(false);
   const [isLive, setIsLive] = useState(false);
+  const [streamId, setStreamId] = useState<string | null>(null);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const [duration, setDuration] = useState(0);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  const handleStartLive = () => {
-    // TODO: Implement WebRTC live streaming
-    alert('Live streaming will be implemented with WebRTC integration');
-    setIsLive(true);
+  // WebRTC hook
+  const webrtc = useWebRTC({
+    streamId: streamId || '',
+    isHost: true,
+    hostId: user?._id || '',
+    onViewerJoined: (viewerId) => {
+      console.log('Viewer joined:', viewerId);
+    },
+    onViewerLeft: (viewerId) => {
+      console.log('Viewer left:', viewerId);
+    },
+  });
+
+  // Enable/disable camera
+  const toggleCamera = async () => {
+    if (cameraEnabled) {
+      // Disable camera
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+      }
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+      }
+      setCameraEnabled(false);
+      setCameraError(null);
+    } else {
+      // Enable camera
+      try {
+        setCameraError(null);
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: 1280, height: 720 },
+          audio: true
+        });
+
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+        setCameraEnabled(true);
+      } catch (error: any) {
+        console.error('Error accessing camera:', error);
+        if (error.name === 'NotAllowedError') {
+          setCameraError('Camera access denied. Please allow camera access in your browser settings.');
+        } else if (error.name === 'NotFoundError') {
+          setCameraError('No camera found. Please connect a camera and try again.');
+        } else {
+          setCameraError('Failed to access camera. Please check your device settings.');
+        }
+      }
+    }
   };
 
-  const handleStopLive = () => {
+  // Auto-enable camera on mount
+  useEffect(() => {
+    const enableCamera = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: 1280, height: 720 },
+          audio: true
+        });
+
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+        setCameraEnabled(true);
+      } catch (error: any) {
+        console.error('Error accessing camera:', error);
+        if (error.name === 'NotAllowedError') {
+          setCameraError('Camera access denied. Please allow camera access in your browser settings.');
+        } else if (error.name === 'NotFoundError') {
+          setCameraError('No camera found. Please connect a camera and try again.');
+        } else {
+          setCameraError('Failed to access camera. Please check your device settings.');
+        }
+      }
+    };
+
+    enableCamera();
+
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, []);
+
+  const handleStartLive = async () => {
+    if (!streamRef.current || !user?._id) return;
+
+    try {
+      // Create live stream in database
+      const response = await liveAPI.startStream({
+        title,
+        description,
+        hostId: user._id,
+        hostName: user.displayName || user.email?.split('@')[0] || 'Unknown',
+        hostAvatar: user.profileImageURL,
+        hostPosition: user.geniusPosition,
+      });
+
+      if (response.success && response.data) {
+        const newStreamId = response.data._id;
+        setStreamId(newStreamId);
+        setIsLive(true);
+
+        // Start WebRTC streaming
+        await webrtc.startStreaming(streamRef.current);
+
+        // Start duration counter
+        durationIntervalRef.current = setInterval(() => {
+          setDuration((prev) => prev + 1);
+        }, 1000);
+      } else {
+        setCameraError('Failed to start live stream. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error starting live stream:', error);
+      setCameraError('Failed to start live stream. Please try again.');
+    }
+  };
+
+  const handleStopLive = async () => {
+    // Stop duration counter
+    if (durationIntervalRef.current) {
+      clearInterval(durationIntervalRef.current);
+      durationIntervalRef.current = null;
+    }
+
+    // Stop WebRTC streaming
+    webrtc.stopStreaming();
+
+    // End stream in database
+    if (streamId) {
+      try {
+        await liveAPI.stopStream(streamId);
+      } catch (error) {
+        console.error('Error ending stream:', error);
+      }
+    }
+
+    // Clean up local stream
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+
+    // Reset state
     setIsLive(false);
     setCameraEnabled(false);
+    setStreamId(null);
+    setDuration(0);
+    setTitle('');
+    setDescription('');
   };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (durationIntervalRef.current) {
+        clearInterval(durationIntervalRef.current);
+      }
+      if (isLive) {
+        handleStopLive();
+      }
+    };
+  }, [isLive]);
 
   return (
     <div className="space-y-6">
@@ -73,23 +242,23 @@ export function GoLiveTab() {
             <label className="block text-sm font-semibold text-text-dark mb-3">
               Camera Preview
             </label>
-            <div className="relative bg-gray-900 rounded-aga overflow-hidden aspect-video flex items-center justify-center">
+            <div className="relative bg-gray-900 rounded-aga overflow-hidden aspect-video">
               {cameraEnabled ? (
-                <div className="text-center">
-                  <Video className="w-16 h-16 text-white mx-auto mb-3" />
-                  <p className="text-white text-sm">
-                    Camera feed will appear here
-                  </p>
-                  <p className="text-gray-400 text-xs mt-1">
-                    (WebRTC integration required)
-                  </p>
-                </div>
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="w-full h-full object-cover"
+                />
               ) : (
-                <div className="text-center">
-                  <VideoOff className="w-16 h-16 text-gray-600 mx-auto mb-3" />
-                  <p className="text-gray-400 text-sm">
-                    Camera is disabled
-                  </p>
+                <div className="w-full h-full flex items-center justify-center">
+                  <div className="text-center">
+                    <VideoOff className="w-16 h-16 text-gray-600 mx-auto mb-3" />
+                    <p className="text-gray-400 text-sm">
+                      Camera is disabled
+                    </p>
+                  </div>
                 </div>
               )}
 
@@ -104,11 +273,18 @@ export function GoLiveTab() {
               )}
             </div>
 
+            {/* Error Message */}
+            {cameraError && (
+              <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-700">{cameraError}</p>
+              </div>
+            )}
+
             <div className="mt-3 flex gap-2">
               <AGAButton
                 variant={cameraEnabled ? 'danger' : 'secondary'}
                 size="sm"
-                onClick={() => setCameraEnabled(!cameraEnabled)}
+                onClick={toggleCamera}
                 leftIcon={cameraEnabled ? <VideoOff className="w-4 h-4" /> : <Video className="w-4 h-4" />}
               >
                 {cameraEnabled ? 'Disable Camera' : 'Enable Camera'}
@@ -180,20 +356,29 @@ export function GoLiveTab() {
               Broadcasting: {title}
             </p>
 
-            {/* Mock Stats */}
+            {/* Live Stats */}
             <div className="flex items-center justify-center gap-8 mb-8">
               <div>
-                <div className="text-3xl font-black text-text-dark">234</div>
+                <div className="flex items-center justify-center gap-2 mb-1">
+                  <UsersIcon className="w-5 h-5 text-primary" />
+                  <div className="text-3xl font-black text-text-dark">{webrtc.viewerCount}</div>
+                </div>
                 <div className="text-sm text-text-gray">Viewers</div>
               </div>
               <div>
-                <div className="text-3xl font-black text-text-dark">12:34</div>
+                <div className="text-3xl font-black text-text-dark">
+                  {Math.floor(duration / 60)}:{(duration % 60).toString().padStart(2, '0')}
+                </div>
                 <div className="text-sm text-text-gray">Duration</div>
               </div>
-              <div>
-                <div className="text-3xl font-black text-text-dark">156</div>
-                <div className="text-sm text-text-gray">Likes</div>
-              </div>
+              {webrtc.isConnected && (
+                <div>
+                  <div className="flex items-center justify-center gap-2 mb-1">
+                    <Wifi className="w-5 h-5 text-green-500" />
+                  </div>
+                  <div className="text-sm text-text-gray">Connected</div>
+                </div>
+              )}
             </div>
 
             <AGAButton

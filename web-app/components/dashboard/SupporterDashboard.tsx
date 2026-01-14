@@ -1,7 +1,7 @@
 'use client';
 
 import { useAuth } from '@/lib/store/auth-store';
-import { AGACard, AGAButton, AGAPill, AGAChip } from '@/components/ui';
+import { AGACard, AGAButton, AGAPill, AGAChip, ShareMenu } from '@/components/ui';
 import Link from 'next/link';
 import {
   Vote,
@@ -34,6 +34,7 @@ interface Post {
   authorAvatar?: string;
   authorPosition?: string;
   content: string;
+  mediaURLs?: string[];
   likesCount: number;
   commentsCount: number;
   sharesCount: number;
@@ -125,7 +126,8 @@ export function SupporterDashboard() {
       try {
         const params: any = { page: 1, limit: 10 };
         if (feedFilter === 'following') {
-          params.following = true;
+          params.userId = user._id;
+          params.feedType = 'following';
         } else if (feedFilter === 'trending') {
           params.sort = 'trending';
         }
@@ -172,26 +174,41 @@ export function SupporterDashboard() {
   const handleLike = useCallback(async (postId: string) => {
     if (!user?._id || postId === 'admin-welcome') return;
     try {
-      const response = await postsAPI.likePost(postId);
-      if (response.success) {
-        setFeedPosts(prev => prev.map(post => {
-          if (post._id === postId) {
-            const isLiked = post.likedBy.includes(user._id);
-            return {
-              ...post,
-              likesCount: isLiked ? post.likesCount - 1 : post.likesCount + 1,
-              likedBy: isLiked
-                ? post.likedBy.filter(id => id !== user._id)
-                : [...post.likedBy, user._id],
-            };
-          }
-          return post;
-        }));
-      }
+      // Optimistically update UI
+      const isLiked = feedPosts.find(p => p._id === postId)?.likedBy.includes(user._id);
+      setFeedPosts(prev => prev.map(post => {
+        if (post._id === postId) {
+          return {
+            ...post,
+            likesCount: isLiked ? post.likesCount - 1 : post.likesCount + 1,
+            likedBy: isLiked
+              ? post.likedBy.filter(id => id !== user._id)
+              : [...post.likedBy, user._id],
+          };
+        }
+        return post;
+      }));
+
+      // Send request to backend
+      await apiClient.post(`/posts/${postId}/like`, { userId: user._id });
     } catch (err) {
       console.error('Failed to like post:', err);
+      // Revert optimistic update on error
+      setFeedPosts(prev => prev.map(post => {
+        if (post._id === postId) {
+          const isLiked = post.likedBy.includes(user._id);
+          return {
+            ...post,
+            likesCount: isLiked ? post.likesCount + 1 : post.likesCount - 1,
+            likedBy: isLiked
+              ? [...post.likedBy, user._id]
+              : post.likedBy.filter(id => id !== user._id),
+          };
+        }
+        return post;
+      }));
     }
-  }, [user?._id]);
+  }, [user?._id, feedPosts]);
 
   // Handle follow action
   const handleFollow = useCallback(async (userId: string) => {
@@ -537,6 +554,41 @@ export function SupporterDashboard() {
                 {post.content}
               </p>
 
+              {/* Post Images */}
+              {post.mediaURLs && post.mediaURLs.length > 0 && (
+                <div className="mb-4 rounded-xl overflow-hidden">
+                  {post.mediaURLs.length === 1 ? (
+                    <div className="relative">
+                      <img
+                        src={`${process.env.NEXT_PUBLIC_API_URL || 'https://africageniusalliance.com'}${post.mediaURLs[0]}`}
+                        alt="Post image"
+                        className="w-full h-auto max-h-[500px] object-cover"
+                      />
+                      <div className="absolute bottom-4 right-4 text-white/15 font-bold text-2xl pointer-events-none select-none">
+                        Africa Genius Alliance
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2">
+                      {post.mediaURLs.slice(0, 4).map((url, index) => (
+                        <div key={index} className="relative">
+                          <img
+                            src={`${process.env.NEXT_PUBLIC_API_URL || 'https://africageniusalliance.com'}${url}`}
+                            alt={`Post image ${index + 1}`}
+                            className="w-full h-48 object-cover"
+                          />
+                          {index === 3 && post.mediaURLs!.length > 4 && (
+                            <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-white text-2xl font-bold">
+                              +{post.mediaURLs!.length - 4}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Post Actions */}
               <div className="flex items-center gap-6 pt-4 border-t border-gray-200">
                 <button
@@ -552,13 +604,14 @@ export function SupporterDashboard() {
                   <MessageCircle className="w-5 h-5" />
                   <span className="text-sm font-medium">{post.commentsCount}</span>
                 </Link>
-                <button
-                  onClick={() => handleShare(post)}
-                  className="flex items-center gap-2 text-text-gray hover:text-primary transition-colors"
-                >
-                  <Share2 className="w-5 h-5" />
-                  <span className="text-sm font-medium">{post.sharesCount}</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <ShareMenu
+                    postId={post._id}
+                    postContent={post.content}
+                    authorName={post.authorName}
+                  />
+                  <span className="text-sm font-medium text-text-gray">{post.sharesCount}</span>
+                </div>
               </div>
             </AGACard>
           ))}

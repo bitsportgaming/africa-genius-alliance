@@ -339,6 +339,8 @@ class HomeAPIService {
                     let sharesCount: Int
                     let likedBy: [String]?
                     let createdAt: String
+                    let isAdminPost: Bool?
+                    let isFeatured: Bool?
                 }
             }
 
@@ -348,7 +350,7 @@ class HomeAPIService {
                 let dateFormatter = ISO8601DateFormatter()
                 dateFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
 
-                return posts.map { post in
+                var feedPosts = posts.map { post in
                     let postType: FeedPost.PostType
                     switch post.postType {
                     case "image": postType = .image
@@ -360,9 +362,11 @@ class HomeAPIService {
                     let createdAt = dateFormatter.date(from: post.createdAt) ?? Date()
                     let isLiked = post.likedBy?.contains(userId) ?? false
                     let imageURL = post.mediaURLs?.first
+                    let isAdminPost = post.isAdminPost ?? false
+                    let isFeatured = post.isFeatured ?? false
 
                     // Debug logging
-                    print("📝 Post: \(post.authorName) - mediaURLs: \(post.mediaURLs ?? []) - imageURL: \(imageURL ?? "nil")")
+                    print("📝 Post: \(post.authorName) - isAdminPost: \(isAdminPost) - mediaURLs: \(post.mediaURLs ?? [])")
 
                     return FeedPost(
                         id: post._id,
@@ -378,9 +382,25 @@ class HomeAPIService {
                         sharesCount: post.sharesCount,
                         createdAt: createdAt,
                         isLiked: isLiked,
-                        isFollowing: false
+                        isFollowing: false,
+                        isAdminPost: isAdminPost,
+                        isFeatured: isFeatured
                     )
                 }
+
+                // Sort: official/admin posts first, then by date
+                feedPosts.sort { a, b in
+                    if a.isOfficialPost && !b.isOfficialPost { return true }
+                    if !a.isOfficialPost && b.isOfficialPost { return false }
+                    return a.createdAt > b.createdAt
+                }
+
+                // If no official posts exist, add the welcome post at the top
+                if !feedPosts.contains(where: { $0.isOfficialPost }) {
+                    feedPosts.insert(FeedPost.agaWelcomePost, at: 0)
+                }
+
+                return feedPosts
             } else {
                 return getMockFeedPosts()
             }
@@ -581,9 +601,11 @@ class HomeAPIService {
 
     private func getMockFeedPosts() -> [FeedPost] {
         return [
-            FeedPost(id: "1", authorId: "1", authorName: "Amina Mensah", authorAvatar: "profile_amina", authorPosition: "Minister of Education", content: "Education is the key to Africa's future. Today I visited 3 rural schools and saw the incredible potential of our youth. We must invest in digital literacy now! 📚💡", imageURL: nil, postType: .text, likesCount: 234, commentsCount: 45, sharesCount: 12, createdAt: Date().addingTimeInterval(-3600), isLiked: false, isFollowing: true),
-            FeedPost(id: "2", authorId: "2", authorName: "Nkosi Dlamini", authorAvatar: "profile_nkosi", authorPosition: "Minister of Digital Economy", content: "Announcing our new fiber optic initiative that will connect 50 rural communities by 2025. This is just the beginning! 🌍🔌", imageURL: "sample_electricity", postType: .image, likesCount: 567, commentsCount: 89, sharesCount: 34, createdAt: Date().addingTimeInterval(-7200), isLiked: true, isFollowing: true),
-            FeedPost(id: "3", authorId: "3", authorName: "Leila Ben Ali", authorAvatar: "profile_leila", authorPosition: "Minister of Transport", content: "The Pan-African rail network isn't just about trains—it's about connecting our people, our markets, and our dreams. 🚂🌍", imageURL: nil, postType: .text, likesCount: 189, commentsCount: 23, sharesCount: 8, createdAt: Date().addingTimeInterval(-14400), isLiked: false, isFollowing: false)
+            // Official AGA post first
+            FeedPost.agaWelcomePost,
+            FeedPost(id: "1", authorId: "1", authorName: "Amina Mensah", authorAvatar: "profile_amina", authorPosition: "Minister of Education", content: "Education is the key to Africa's future. Today I visited 3 rural schools and saw the incredible potential of our youth. We must invest in digital literacy now! 📚💡", imageURL: nil, postType: .text, likesCount: 234, commentsCount: 45, sharesCount: 12, createdAt: Date().addingTimeInterval(-3600), isLiked: false, isFollowing: true, isAdminPost: false, isFeatured: false),
+            FeedPost(id: "2", authorId: "2", authorName: "Nkosi Dlamini", authorAvatar: "profile_nkosi", authorPosition: "Minister of Digital Economy", content: "Announcing our new fiber optic initiative that will connect 50 rural communities by 2025. This is just the beginning! 🌍🔌", imageURL: "sample_electricity", postType: .image, likesCount: 567, commentsCount: 89, sharesCount: 34, createdAt: Date().addingTimeInterval(-7200), isLiked: true, isFollowing: true, isAdminPost: false, isFeatured: false),
+            FeedPost(id: "3", authorId: "3", authorName: "Leila Ben Ali", authorAvatar: "profile_leila", authorPosition: "Minister of Transport", content: "The Pan-African rail network isn't just about trains—it's about connecting our people, our markets, and our dreams. 🚂🌍", imageURL: nil, postType: .text, likesCount: 189, commentsCount: 23, sharesCount: 8, createdAt: Date().addingTimeInterval(-14400), isLiked: false, isFollowing: false, isAdminPost: false, isFeatured: false)
         ]
     }
 }
@@ -637,12 +659,41 @@ struct FeedPost: Identifiable {
     var createdAt: Date
     var isLiked: Bool
     var isFollowing: Bool
+    var isAdminPost: Bool
+    var isFeatured: Bool
 
     enum PostType: String, Codable {
         case text
         case image
         case video
         case liveAnnouncement
+    }
+
+    /// Check if this is an official AGA post
+    var isOfficialPost: Bool {
+        isAdminPost || authorName == "AGA Official" || authorPosition.contains("Africa Genius Alliance")
+    }
+
+    /// Static AGA Welcome post to show first
+    static var agaWelcomePost: FeedPost {
+        FeedPost(
+            id: "aga-official-welcome",
+            authorId: "aga-official",
+            authorName: "AGA Official",
+            authorAvatar: nil,
+            authorPosition: "Africa Genius Alliance",
+            content: "🌍 Welcome to Africa Genius Alliance! Together, we are building a platform where merit drives leadership. Every vote counts, every voice matters. Join us in shaping Africa's future!\n\n—\nThis communication is issued by Africa Genius Alliance. Official statements represent the collective voice of our platform and community.",
+            imageURL: nil,
+            postType: .text,
+            likesCount: 892,
+            commentsCount: 156,
+            sharesCount: 78,
+            createdAt: Date(),
+            isLiked: false,
+            isFollowing: true,
+            isAdminPost: true,
+            isFeatured: true
+        )
     }
 }
 

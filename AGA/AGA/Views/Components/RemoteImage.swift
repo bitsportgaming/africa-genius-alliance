@@ -61,12 +61,19 @@ struct RemoteImage: View {
         print("🔍 RemoteImage: urlString = \(urlString)")
 
         // Build full URL
-        let fullURLString: String
+        var fullURLString: String
+
+        // If it starts with http:// or https://, use as-is
         if urlString.hasPrefix("http") {
-            fullURLString = urlString
+            // Convert HTTP to HTTPS
+            if urlString.hasPrefix("http://") {
+                fullURLString = urlString.replacingOccurrences(of: "http://", with: "https://")
+            } else {
+                fullURLString = urlString
+            }
         } else {
-            // Construct full URL manually
-            let base = "https://api.globalgeniusalliance.org"
+            // Construct full URL with correct domain
+            let base = "https://africageniusalliance.com"
             let path = urlString.hasPrefix("/") ? urlString : "/\(urlString)"
             fullURLString = "\(base)\(path)"
         }

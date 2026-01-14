@@ -4,9 +4,9 @@ import { useState, useCallback, useEffect } from 'react';
 import { ProtectedRoute } from '@/components/layout/ProtectedRoute';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { AGACard, AGAButton, AGAPill, AGAChip } from '@/components/ui';
-import { Search, Filter, TrendingUp, Users, MapPin, Grid, List, Loader2 } from 'lucide-react';
+import { Search, Filter, TrendingUp, Users, MapPin, Grid, List, Loader2, ThumbsUp } from 'lucide-react';
 import Link from 'next/link';
-import { usersAPI } from '@/lib/api';
+import { usersAPI, apiClient } from '@/lib/api';
 import { useAuth } from '@/lib/store/auth-store';
 
 interface Genius {
@@ -31,6 +31,8 @@ export default function ExplorePage() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [followingUsers, setFollowingUsers] = useState<Set<string>>(new Set());
   const [followLoading, setFollowLoading] = useState<string | null>(null);
+  const [voteLoading, setVoteLoading] = useState<string | null>(null);
+  const [votedGeniuses, setVotedGeniuses] = useState<Set<string>>(new Set());
   const [geniuses, setGeniuses] = useState<Genius[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -96,6 +98,25 @@ export default function ExplorePage() {
       setFollowLoading(null);
     }
   }, [user?._id, followingUsers]);
+
+  // Handle vote action
+  const handleVote = useCallback(async (geniusId: string) => {
+    if (!user?._id) return;
+    setVoteLoading(geniusId);
+    try {
+      await apiClient.post(`/users/${geniusId}/vote`, { voterId: user._id });
+      setVotedGeniuses(prev => new Set(prev).add(geniusId));
+
+      // Update the genius votes count in the UI
+      setGeniuses(prev => prev.map(g =>
+        g.id === geniusId ? { ...g, votes: g.votes + 1 } : g
+      ));
+    } catch (err) {
+      console.error('Failed to vote:', err);
+    } finally {
+      setVoteLoading(null);
+    }
+  }, [user?._id]);
 
   // Categories and countries for filtering
   const categories = ['All', 'Political', 'Oversight', 'Technical', 'Civic'];
@@ -300,21 +321,43 @@ export default function ExplorePage() {
                   </div>
 
                   {/* Actions */}
-                  <div className="flex gap-2">
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <AGAButton
+                        variant={followingUsers.has(genius.id) ? 'outline' : 'primary'}
+                        size="sm"
+                        fullWidth
+                        loading={followLoading === genius.id}
+                        onClick={() => handleFollow(genius.id)}
+                      >
+                        {followingUsers.has(genius.id) ? 'Following' : 'Follow'}
+                      </AGAButton>
+                      <Link href={`/user/${genius.id}`} className="flex-1">
+                        <AGAButton variant="outline" size="sm" fullWidth>
+                          View
+                        </AGAButton>
+                      </Link>
+                    </div>
                     <AGAButton
-                      variant={followingUsers.has(genius.id) ? 'outline' : 'primary'}
+                      variant={votedGeniuses.has(genius.id) ? 'outline' : 'secondary'}
                       size="sm"
                       fullWidth
-                      loading={followLoading === genius.id}
-                      onClick={() => handleFollow(genius.id)}
+                      loading={voteLoading === genius.id}
+                      onClick={() => handleVote(genius.id)}
+                      disabled={votedGeniuses.has(genius.id)}
                     >
-                      {followingUsers.has(genius.id) ? 'Following' : 'Follow'}
+                      {votedGeniuses.has(genius.id) ? (
+                        <>
+                          <ThumbsUp className="w-4 h-4 mr-2 fill-current" />
+                          Voted
+                        </>
+                      ) : (
+                        <>
+                          <ThumbsUp className="w-4 h-4 mr-2" />
+                          Vote
+                        </>
+                      )}
                     </AGAButton>
-                    <Link href={`/genius/${genius.id}`}>
-                      <AGAButton variant="outline" size="sm">
-                        View
-                      </AGAButton>
-                    </Link>
                   </div>
                 </AGACard>
               ))}
@@ -400,7 +443,26 @@ export default function ExplorePage() {
                       >
                         {followingUsers.has(genius.id) ? 'Following' : 'Follow'}
                       </AGAButton>
-                      <Link href={`/genius/${genius.id}`}>
+                      <AGAButton
+                        variant={votedGeniuses.has(genius.id) ? 'outline' : 'secondary'}
+                        size="sm"
+                        loading={voteLoading === genius.id}
+                        onClick={() => handleVote(genius.id)}
+                        disabled={votedGeniuses.has(genius.id)}
+                      >
+                        {votedGeniuses.has(genius.id) ? (
+                          <>
+                            <ThumbsUp className="w-4 h-4 mr-2 fill-current" />
+                            Voted
+                          </>
+                        ) : (
+                          <>
+                            <ThumbsUp className="w-4 h-4 mr-2" />
+                            Vote
+                          </>
+                        )}
+                      </AGAButton>
+                      <Link href={`/user/${genius.id}`}>
                         <AGAButton variant="outline" size="sm">
                           View Profile
                         </AGAButton>

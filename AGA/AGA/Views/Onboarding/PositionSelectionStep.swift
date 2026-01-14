@@ -150,12 +150,76 @@ struct PositionSelectionStep: View {
                         ) {
                             withAnimation(.spring(response: 0.3)) {
                                 selectedPosition = position
+                                customRole = "" // Clear custom role when selecting predefined
                             }
                             HapticFeedback.impact(.light)
                         }
                     }
+
+                    // Other button
+                    Button(action: {
+                        withAnimation(.spring(response: 0.3)) {
+                            selectedPosition = nil
+                        }
+                        HapticFeedback.impact(.light)
+                    }) {
+                        VStack(spacing: 10) {
+                            ZStack {
+                                Circle()
+                                    .fill(selectedPosition == nil && !customRole.isEmpty ? Color(hex: category?.color ?? "0a4d3c") : Color(hex: category?.color ?? "0a4d3c").opacity(0.1))
+                                    .frame(width: 44, height: 44)
+
+                                Image(systemName: "pencil")
+                                    .font(.system(size: 18))
+                                    .foregroundColor(selectedPosition == nil && !customRole.isEmpty ? .white : Color(hex: category?.color ?? "0a4d3c"))
+                            }
+
+                            Text("Other")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(selectedPosition == nil && !customRole.isEmpty ? .white : Color(hex: "374151"))
+                                .multilineTextAlignment(.center)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .padding(.horizontal, 6)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14)
+                                .fill(selectedPosition == nil && !customRole.isEmpty ? Color(hex: category?.color ?? "0a4d3c") : Color.white)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14)
+                                .stroke(selectedPosition == nil && !customRole.isEmpty ? Color.clear : Color(hex: "e5e7eb"), lineWidth: 1)
+                        )
+                        .shadow(color: selectedPosition == nil && !customRole.isEmpty ? Color(hex: category?.color ?? "0a4d3c").opacity(0.3) : .clear, radius: 8, x: 0, y: 4)
+                    }
                 }
                 .padding(.horizontal, 20)
+
+                // Custom electoral position input - shown when "Other" is active
+                if selectedPosition == nil {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Specify Your Electoral Position")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(.white)
+
+                        Text("Examples: \"Senator for Ogun State\", \"Mayor of Lagos\", \"Councilor for Ward 3\"")
+                            .font(.system(size: 12))
+                            .foregroundColor(.white.opacity(0.6))
+
+                        TextField("Enter your position title", text: $customRole)
+                            .textInputAutocapitalization(.words)
+                            .foregroundColor(.white)
+                            .padding(14)
+                            .background(Color.white.opacity(0.1))
+                            .cornerRadius(12)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(!customRole.isEmpty ? Color(hex: "f59e0b").opacity(0.5) : Color.white.opacity(0.2), lineWidth: 1)
+                            )
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 8)
+                }
             }
         }
     }

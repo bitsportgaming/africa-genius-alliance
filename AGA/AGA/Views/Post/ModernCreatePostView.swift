@@ -237,13 +237,16 @@ struct ModernCreatePostView: View {
         do {
             isUploadingImages = true
 
-            // Create post with media directly
+            // Apply watermark to all images before uploading
+            let watermarkedImages = selectedImages.compactMap { $0.withWatermark() }
+
+            // Create post with watermarked media
             _ = try await PostAPIService.shared.createPostWithMedia(
                 authorId: user.id,
                 authorName: user.displayName,
                 authorPosition: user.bio ?? "",
                 content: content,
-                images: selectedImages
+                images: watermarkedImages
             )
 
             isUploadingImages = false

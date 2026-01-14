@@ -1,13 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ProtectedRoute } from '@/components/layout/ProtectedRoute';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { AGACard, AGAButton, AGAPill } from '@/components/ui';
 import { liveAPI, LiveStream } from '@/lib/api';
 import { useAuth } from '@/lib/store/auth-store';
-import { Radio, Users, Heart, ArrowLeft, Loader2, Share2, MessageCircle } from 'lucide-react';
+import { useWebRTC } from '@/lib/webrtc/useWebRTC';
+import { Radio, Users, Heart, ArrowLeft, Loader2, Share2, MessageCircle, Wifi } from 'lucide-react';
 import Link from 'next/link';
 
 export default function LiveStreamViewerPage() {
@@ -15,12 +16,46 @@ export default function LiveStreamViewerPage() {
   const router = useRouter();
   const { user } = useAuth();
   const streamId = params.id as string;
-  
+
   const [stream, setStream] = useState<LiveStream | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isLiked, setIsLiked] = useState(false);
   const [hasJoined, setHasJoined] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+
+  // WebRTC hook for viewer
+  const webrtc = useWebRTC({
+    streamId: streamId || '',
+    isHost: false,
+    hostId: stream?.hostId,
+    viewerId: user?._id || '',
+    onStreamEnded: () => {
+      setError('Stream has ended');
+      router.push('/live');
+    },
+  });
+
+  // Handle remote stream from WebRTC
+  useEffect(() => {
+    if (!stream?.hostId || !webrtc.isConnected) return;
+
+    // Get remote stream from the host's socket ID
+    // We need to get this from the peer connection
+    const checkForStream = setInterval(() => {
+      const remoteMediaStream = webrtc.getRemoteStream(stream.hostId);
+      if (remoteMediaStream && remoteMediaStream.getTracks().length > 0) {
+        setRemoteStream(remoteMediaStream);
+        if (videoRef.current) {
+          videoRef.current.srcObject = remoteMediaStream;
+        }
+        clearInterval(checkForStream);
+      }
+    }, 500);
+
+    return () => clearInterval(checkForStream);
+  }, [stream?.hostId, webrtc, webrtc.isConnected]);
 
   useEffect(() => {
     const fetchStream = async () => {
@@ -136,13 +171,34 @@ export default function LiveStreamViewerPage() {
           </button>
 
           {/* Video Player Area */}
-          <div className="relative bg-gradient-to-br from-gray-900 to-black rounded-2xl overflow-hidden aspect-video flex items-center justify-center">
-            <div className="text-center text-white">
-              <Radio className="w-20 h-20 mx-auto mb-4 animate-pulse text-red-500" />
-              <p className="text-xl font-bold">{stream.title}</p>
-              <p className="text-gray-400 mt-2">Live stream video would appear here</p>
-            </div>
-            
+          <div className="relative bg-gradient-to-br from-gray-900 to-black rounded-2xl overflow-hidden aspect-video">
+            {remoteStream ? (
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <div className="text-center text-white">
+                  {webrtc.isConnected ? (
+                    <>
+                      <Loader2 className="w-20 h-20 mx-auto mb-4 animate-spin text-primary" />
+                      <p className="text-xl font-bold">Connecting to stream...</p>
+                      <p className="text-gray-400 mt-2">Please wait while we connect you to the live stream</p>
+                    </>
+                  ) : (
+                    <>
+                      <Wifi className="w-20 h-20 mx-auto mb-4 text-gray-600" />
+                      <p className="text-xl font-bold">Establishing connection...</p>
+                      <p className="text-gray-400 mt-2">Connecting to signaling server</p>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Live Badge */}
             <div className="absolute top-4 left-4">
               <AGAPill variant="danger" size="md" className="animate-pulse">
@@ -155,6 +211,14 @@ export default function LiveStreamViewerPage() {
               <Users className="w-5 h-5" />
               <span className="font-semibold">{stream.viewerCount.toLocaleString()} watching</span>
             </div>
+
+            {/* Connection Status Indicator */}
+            {remoteStream && (
+              <div className="absolute bottom-4 right-4 flex items-center gap-2 bg-green-600/80 px-3 py-2 rounded-lg text-white text-sm">
+                <Wifi className="w-4 h-4" />
+                <span>Connected</span>
+              </div>
+            )}
           </div>
 
           {/* Stream Info */}

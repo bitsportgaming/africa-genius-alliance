@@ -371,12 +371,16 @@ router.post('/posts', isAdmin, async (req, res) => {
             return res.status(404).json({ success: false, error: 'Admin user not found' });
         }
 
+        // Add official declaration footer to admin posts
+        const declaration = '\n\n—\nThis communication is issued by Africa Genius Alliance. Official statements represent the collective voice of our platform and community.';
+        const contentWithDeclaration = content.trim() + declaration;
+
         const post = new Post({
             authorId: adminUser.userId,
-            authorName: adminUser.displayName || 'AGA Admin',
+            authorName: 'AGA Official',
             authorAvatar: adminUser.profileImageURL || null,
             authorPosition: 'Africa Genius Alliance',
-            content: content.trim(),
+            content: contentWithDeclaration,
             mediaURLs: mediaURLs || [],
             mediaType: mediaURLs && mediaURLs.length > 0 ? 'image' : 'none',
             postType: mediaURLs && mediaURLs.length > 0 ? 'image' : 'text',

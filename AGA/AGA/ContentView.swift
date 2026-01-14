@@ -52,7 +52,9 @@ struct MainTabView: View {
                     // Tab 3: Impact (renamed from Rank, role-based content)
                     Group {
                         if isGenius {
-                            GeniusImpactView()
+                            GeniusImpactView(onSwitchToCreateTab: {
+                                selectedTab = 2 // Switch to Create tab
+                            })
                         } else {
                             SupporterImpactView()
                         }

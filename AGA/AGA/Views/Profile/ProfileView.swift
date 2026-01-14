@@ -115,16 +115,6 @@ struct LegacyProfileView: View {
                     }
                     .buttonStyle(.bordered)
 
-                    #if DEBUG
-                    NavigationLink {
-                        DeveloperSettingsView()
-                    } label: {
-                        Label("Developer Settings", systemImage: "hammer.fill")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.bordered)
-                    #endif
-
                     Button(role: .destructive) {
                         authService.signOut()
                     } label: {

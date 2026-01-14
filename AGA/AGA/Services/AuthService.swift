@@ -76,6 +76,7 @@ class AuthService {
     func signOut() {
         self.currentUser = nil
         clearSavedUser()
+        KeychainService.shared.deleteToken()
     }
 
     func updateUserRole(to role: UserRole) {

@@ -11,6 +11,10 @@ struct GeniusImpactView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
     @State private var impactData: GeniusImpactData?
     @State private var isLoading = true
+    @State private var showCreatePost = false
+
+    // Callback to switch to Create tab (set by parent)
+    var onSwitchToCreateTab: (() -> Void)?
 
     var body: some View {
         ZStack {
@@ -184,7 +188,13 @@ struct GeniusImpactView: View {
     // MARK: - Boost Impact CTA
     private var boostImpactCTA: some View {
         Button(action: {
-            // Deep link to Create tab - handled by parent navigation
+            HapticFeedback.impact(.medium)
+            // Try callback first, fallback to showing create post sheet
+            if let callback = onSwitchToCreateTab {
+                callback()
+            } else {
+                showCreatePost = true
+            }
         }) {
             HStack {
                 Image(systemName: "bolt.fill")
@@ -203,6 +213,9 @@ struct GeniusImpactView: View {
                 )
             )
             .cornerRadius(16)
+        }
+        .sheet(isPresented: $showCreatePost) {
+            CreatePostSheet()
         }
     }
 

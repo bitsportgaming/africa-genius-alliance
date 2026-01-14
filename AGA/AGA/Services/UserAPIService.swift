@@ -27,8 +27,22 @@ struct APIUser: Codable {
     let updatedAt: String?
 }
 
-// MARK: - Auth Response
+// MARK: - Auth Data (with token)
+struct AuthData: Codable {
+    let user: APIUser
+    let token: String
+}
+
+// MARK: - Auth Response (for login/register with token)
 struct AuthResponse: Codable {
+    let success: Bool
+    let data: AuthData?
+    let message: String?
+    let error: String?
+}
+
+// MARK: - Profile Response (for profile endpoints without token)
+struct ProfileResponse: Codable {
     let success: Bool
     let data: APIUser?
     let message: String?
@@ -84,9 +98,11 @@ class UserAPIService {
         }
         
         let result = try JSONDecoder().decode(AuthResponse.self, from: data)
-        
-        if httpResponse.statusCode == 201, result.success, let user = result.data {
-            return user
+
+        if httpResponse.statusCode == 201, result.success, let authData = result.data {
+            // Store token securely in Keychain
+            try KeychainService.shared.saveToken(authData.token)
+            return authData.user
         } else {
             throw APIError.custom(result.error ?? "Registration failed")
         }
@@ -116,9 +132,11 @@ class UserAPIService {
         }
         
         let result = try JSONDecoder().decode(AuthResponse.self, from: data)
-        
-        if httpResponse.statusCode == 200, result.success, let user = result.data {
-            return user
+
+        if httpResponse.statusCode == 200, result.success, let authData = result.data {
+            // Store token securely in Keychain
+            try KeychainService.shared.saveToken(authData.token)
+            return authData.user
         } else {
             throw APIError.custom(result.error ?? "Login failed")
         }
@@ -129,15 +147,15 @@ class UserAPIService {
         guard let url = URL(string: "\(baseURL)/auth/profile/\(userId)") else {
             throw APIError.invalidURL
         }
-        
+
         let (data, response) = try await URLSession.shared.data(from: url)
-        
+
         guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
             throw APIError.serverError
         }
-        
-        let result = try JSONDecoder().decode(AuthResponse.self, from: data)
-        
+
+        let result = try JSONDecoder().decode(ProfileResponse.self, from: data)
+
         if result.success, let user = result.data {
             return user
         } else {
@@ -170,12 +188,12 @@ class UserAPIService {
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         
         let (data, response) = try await URLSession.shared.data(for: request)
-        
+
         guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
             throw APIError.serverError
         }
-        
-        let result = try JSONDecoder().decode(AuthResponse.self, from: data)
+
+        let result = try JSONDecoder().decode(ProfileResponse.self, from: data)
 
         if result.success, let user = result.data {
             return user
@@ -229,7 +247,7 @@ class UserAPIService {
             throw APIError.serverError
         }
 
-        let result = try JSONDecoder().decode(AuthResponse.self, from: data)
+        let result = try JSONDecoder().decode(ProfileResponse.self, from: data)
 
         if result.success, let user = result.data {
             return user
@@ -271,7 +289,7 @@ class UserAPIService {
             throw APIError.serverError
         }
 
-        let result = try JSONDecoder().decode(AuthResponse.self, from: data)
+        let result = try JSONDecoder().decode(ProfileResponse.self, from: data)
 
         if result.success, let user = result.data, let imageURL = user.profileImageURL {
             return imageURL

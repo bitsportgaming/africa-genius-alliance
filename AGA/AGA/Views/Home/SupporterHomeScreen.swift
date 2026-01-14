@@ -453,7 +453,9 @@ struct FeedPostCard: View {
     var onShare: (() -> Void)? = nil
     var onBookmark: (() -> Void)? = nil
     @State private var isLiked: Bool
+    @State private var likesCount: Int
     @State private var isBookmarked = false
+    @Environment(AuthService.self) private var authService
 
     init(post: FeedPost, onComment: (() -> Void)? = nil, onShare: (() -> Void)? = nil, onBookmark: (() -> Void)? = nil) {
         self.post = post
@@ -461,10 +463,45 @@ struct FeedPostCard: View {
         self.onShare = onShare
         self.onBookmark = onBookmark
         self._isLiked = State(initialValue: post.isLiked)
+        self._likesCount = State(initialValue: post.likesCount)
+    }
+
+    private func handleLike() async {
+        guard let userId = authService.currentUser?.id else { return }
+
+        // Optimistically update UI
+        isLiked.toggle()
+        likesCount += isLiked ? 1 : -1
+        HapticFeedback.impact(.light)
+
+        do {
+            _ = try await PostAPIService.shared.likePost(postId: post.id, userId: userId)
+        } catch {
+            // Revert on error
+            isLiked.toggle()
+            likesCount += isLiked ? 1 : -1
+            print("Failed to like post: \(error)")
+        }
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            // Official Post Badge
+            if post.isOfficialPost {
+                HStack(spacing: 6) {
+                    Image(systemName: "checkmark.seal.fill")
+                        .font(.system(size: 12))
+                        .foregroundColor(Color(hex: "10b981"))
+                    Text("Official AGA Communication")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(Color(hex: "10b981"))
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(Color(hex: "10b981").opacity(0.1))
+                .cornerRadius(8)
+            }
+
             // Author Header
             HStack(spacing: 10) {
                 if let avatarURL = post.authorAvatar, !avatarURL.isEmpty {
@@ -476,21 +513,36 @@ struct FeedPostCard: View {
                 } else {
                     ZStack {
                         Circle()
-                            .fill(DesignSystem.Gradients.genius)
+                            .fill(post.isOfficialPost ?
+                                  LinearGradient(colors: [Color(hex: "10b981"), Color(hex: "059669")], startPoint: .topLeading, endPoint: .bottomTrailing) :
+                                  DesignSystem.Gradients.genius)
                             .frame(width: 40, height: 40)
-                        Text(String(post.authorName.prefix(2)).uppercased())
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundColor(.white)
+                        if post.isOfficialPost {
+                            Image(systemName: "globe.africa.fill")
+                                .font(.system(size: 18))
+                                .foregroundColor(.white)
+                        } else {
+                            Text(String(post.authorName.prefix(2)).uppercased())
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundColor(.white)
+                        }
                     }
                 }
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(post.authorName)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(Color(hex: "1f2937"))
+                    HStack(spacing: 4) {
+                        Text(post.authorName)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(Color(hex: "1f2937"))
+                        if post.isOfficialPost {
+                            Image(systemName: "checkmark.seal.fill")
+                                .font(.system(size: 12))
+                                .foregroundColor(Color(hex: "10b981"))
+                        }
+                    }
                     Text(post.authorPosition)
                         .font(.system(size: 12))
-                        .foregroundColor(Color(hex: "6b7280"))
+                        .foregroundColor(post.isOfficialPost ? Color(hex: "10b981") : Color(hex: "6b7280"))
                 }
 
                 Spacer()
@@ -508,18 +560,29 @@ struct FeedPostCard: View {
 
             // Image if present
             if let imageURL = post.imageURL, !imageURL.isEmpty {
-                RemoteImage(urlString: imageURL)
-                    .frame(height: 180)
-                    .cornerRadius(12)
+                ZStack {
+                    RemoteImage(urlString: imageURL)
+                        .frame(height: 450)  // Instagram-size height
+                        .frame(maxWidth: .infinity)
+                        .cornerRadius(12)
+
+                    // AGA Watermark
+                    AGAWatermark(opacity: 0.15, fontSize: 24, color: .white)
+                }
+                .clipped()
             }
 
             // Action Bar
             HStack(spacing: 24) {
-                Button(action: { isLiked.toggle() }) {
+                Button(action: {
+                    Task {
+                        await handleLike()
+                    }
+                }) {
                     HStack(spacing: 4) {
                         Image(systemName: isLiked ? "heart.fill" : "heart")
                             .foregroundColor(isLiked ? Color(hex: "ef4444") : Color(hex: "6b7280"))
-                        Text("\(post.likesCount)")
+                        Text("\(likesCount)")
                             .font(.system(size: 12))
                             .foregroundColor(Color(hex: "6b7280"))
                     }

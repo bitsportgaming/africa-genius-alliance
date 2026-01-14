@@ -41,9 +41,40 @@ const upload = multer({
 // GET /api/posts - Get all posts (feed)
 router.get('/', async (req, res) => {
     try {
-        const { page = 1, limit = 20, authorId } = req.query;
+        const { page = 1, limit = 20, authorId, userId, feedType = 'all' } = req.query;
         const query = { isActive: true };
-        if (authorId) query.authorId = authorId;
+
+        // Filter by specific author
+        if (authorId) {
+            query.authorId = authorId;
+        }
+        // Filter by feed type for the requesting user
+        else if (userId && feedType) {
+            if (feedType === 'own') {
+                // Show only user's own posts
+                query.authorId = userId;
+            } else if (feedType === 'following') {
+                // Show posts from users they follow
+                const User = require('../models/User');
+                const user = await User.findOne({ userId });
+                if (user && user.following && user.following.length > 0) {
+                    query.authorId = { $in: user.following };
+                } else {
+                    // If not following anyone, return empty array
+                    return res.json({
+                        success: true,
+                        data: [],
+                        pagination: {
+                            page: parseInt(page),
+                            limit: parseInt(limit),
+                            total: 0,
+                            pages: 0
+                        }
+                    });
+                }
+            }
+            // feedType === 'all' shows all posts (default behavior)
+        }
 
         const posts = await Post.find(query)
             .sort({ createdAt: -1 })

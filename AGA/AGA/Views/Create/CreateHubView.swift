@@ -298,36 +298,275 @@ struct ScheduleLiveSheet: View {
 // MARK: - Proposals Sheet
 struct ProposalsSheet: View {
     @Environment(\.dismiss) var dismiss
+    @EnvironmentObject var authViewModel: AuthViewModel
+
+    @State private var title = ""
+    @State private var description = ""
+    @State private var selectedCategory = "policy"
+    @State private var implementationDetails = ""
+    @State private var impact = ""
+    @State private var votingDays = 7
+    @State private var isSubmitting = false
+    @State private var showSuccess = false
+    @State private var errorMessage: String?
+
+    let categories = ["policy", "funding", "governance", "community", "technical"]
+
+    var isValid: Bool {
+        !title.isEmpty && !description.isEmpty && description.count >= 50
+    }
 
     var body: some View {
         NavigationView {
-            VStack(spacing: 20) {
-                Spacer()
+            ZStack {
+                Color(hex: "fef9e7").ignoresSafeArea()
 
-                Image(systemName: "doc.text.fill")
-                    .font(.system(size: 60))
-                    .foregroundColor(Color(hex: "8b5cf6"))
+                if showSuccess {
+                    successView
+                } else {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 24) {
+                            // Header Info
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Create a Proposal")
+                                    .font(.system(size: 24, weight: .bold))
+                                    .foregroundColor(Color(hex: "1f2937"))
 
-                Text("Proposals Coming Soon")
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundColor(Color(hex: "1f2937"))
+                                Text("Submit policy proposals for community voting. Clear, detailed proposals are more likely to pass.")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(Color(hex: "6b7280"))
+                            }
+                            .padding(.horizontal)
 
-                Text("Create long-form policy documents and manifesto updates to share your detailed vision with supporters.")
-                    .font(.system(size: 15))
-                    .foregroundColor(Color(hex: "6b7280"))
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 32)
+                            // Form Fields
+                            VStack(spacing: 20) {
+                                // Title
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text("Proposal Title")
+                                        .font(.system(size: 14, weight: .semibold))
+                                        .foregroundColor(Color(hex: "374151"))
 
-                Spacer()
+                                    TextField("e.g., Increase Education Budget by 15%", text: $title)
+                                        .textFieldStyle(ProposalTextFieldStyle())
+                                }
+
+                                // Category
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text("Category")
+                                        .font(.system(size: 14, weight: .semibold))
+                                        .foregroundColor(Color(hex: "374151"))
+
+                                    ScrollView(.horizontal, showsIndicators: false) {
+                                        HStack(spacing: 10) {
+                                            ForEach(categories, id: \.self) { cat in
+                                                Button(action: { selectedCategory = cat }) {
+                                                    Text(cat.capitalized)
+                                                        .font(.system(size: 13, weight: .medium))
+                                                        .padding(.horizontal, 16)
+                                                        .padding(.vertical, 8)
+                                                        .background(selectedCategory == cat ? Color(hex: "8b5cf6") : Color.white)
+                                                        .foregroundColor(selectedCategory == cat ? .white : Color(hex: "6b7280"))
+                                                        .cornerRadius(20)
+                                                        .overlay(
+                                                            RoundedRectangle(cornerRadius: 20)
+                                                                .stroke(selectedCategory == cat ? Color.clear : Color(hex: "e5e7eb"), lineWidth: 1)
+                                                        )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Description
+                                VStack(alignment: .leading, spacing: 8) {
+                                    HStack {
+                                        Text("Description")
+                                            .font(.system(size: 14, weight: .semibold))
+                                            .foregroundColor(Color(hex: "374151"))
+                                        Spacer()
+                                        Text("\(description.count) chars (min 50)")
+                                            .font(.system(size: 12))
+                                            .foregroundColor(description.count >= 50 ? Color(hex: "10b981") : Color(hex: "9ca3af"))
+                                    }
+
+                                    TextEditor(text: $description)
+                                        .frame(minHeight: 120)
+                                        .padding(12)
+                                        .background(Color.white)
+                                        .cornerRadius(12)
+                                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(hex: "e5e7eb"), lineWidth: 1))
+                                }
+
+                                // Implementation Details (Optional)
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text("Implementation Plan (Optional)")
+                                        .font(.system(size: 14, weight: .semibold))
+                                        .foregroundColor(Color(hex: "374151"))
+
+                                    TextEditor(text: $implementationDetails)
+                                        .frame(minHeight: 80)
+                                        .padding(12)
+                                        .background(Color.white)
+                                        .cornerRadius(12)
+                                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(hex: "e5e7eb"), lineWidth: 1))
+                                }
+
+                                // Expected Impact (Optional)
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text("Expected Impact (Optional)")
+                                        .font(.system(size: 14, weight: .semibold))
+                                        .foregroundColor(Color(hex: "374151"))
+
+                                    TextField("e.g., Benefits 2 million students", text: $impact)
+                                        .textFieldStyle(ProposalTextFieldStyle())
+                                }
+
+                                // Voting Duration
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text("Voting Duration")
+                                        .font(.system(size: 14, weight: .semibold))
+                                        .foregroundColor(Color(hex: "374151"))
+
+                                    HStack(spacing: 12) {
+                                        ForEach([7, 14, 30], id: \.self) { days in
+                                            Button(action: { votingDays = days }) {
+                                                Text("\(days) days")
+                                                    .font(.system(size: 13, weight: .medium))
+                                                    .padding(.horizontal, 16)
+                                                    .padding(.vertical, 10)
+                                                    .background(votingDays == days ? Color(hex: "10b981") : Color.white)
+                                                    .foregroundColor(votingDays == days ? .white : Color(hex: "6b7280"))
+                                                    .cornerRadius(10)
+                                                    .overlay(
+                                                        RoundedRectangle(cornerRadius: 10)
+                                                            .stroke(votingDays == days ? Color.clear : Color(hex: "e5e7eb"), lineWidth: 1)
+                                                    )
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Error Message
+                                if let error = errorMessage {
+                                    Text(error)
+                                        .font(.system(size: 13))
+                                        .foregroundColor(.red)
+                                        .padding(.horizontal)
+                                }
+
+                                // Submit Button
+                                Button(action: submitProposal) {
+                                    HStack {
+                                        if isSubmitting {
+                                            ProgressView()
+                                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                                .scaleEffect(0.9)
+                                        }
+                                        Text(isSubmitting ? "Submitting..." : "Submit Proposal")
+                                            .font(.system(size: 16, weight: .semibold))
+                                    }
+                                    .foregroundColor(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 16)
+                                    .background(isValid ? Color(hex: "8b5cf6") : Color(hex: "d1d5db"))
+                                    .cornerRadius(14)
+                                }
+                                .disabled(!isValid || isSubmitting)
+                            }
+                            .padding(.horizontal)
+                            .padding(.bottom, 40)
+                        }
+                        .padding(.top, 20)
+                    }
+                }
             }
-            .navigationTitle("Proposals")
+            .navigationTitle("New Proposal")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Done") { dismiss() }
+                    Button("Cancel") { dismiss() }
                 }
             }
         }
+    }
+
+    private var successView: some View {
+        VStack(spacing: 24) {
+            Spacer()
+
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 80))
+                .foregroundColor(Color(hex: "10b981"))
+
+            Text("Proposal Submitted!")
+                .font(.system(size: 24, weight: .bold))
+                .foregroundColor(Color(hex: "1f2937"))
+
+            Text("Your proposal is now live for community voting. You'll be notified when voting concludes.")
+                .font(.system(size: 15))
+                .foregroundColor(Color(hex: "6b7280"))
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 32)
+
+            Spacer()
+
+            Button(action: { dismiss() }) {
+                Text("Done")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(Color(hex: "8b5cf6"))
+                    .cornerRadius(14)
+            }
+            .padding(.horizontal, 24)
+            .padding(.bottom, 40)
+        }
+    }
+
+    private func submitProposal() {
+        guard let user = authViewModel.currentUser else { return }
+
+        isSubmitting = true
+        errorMessage = nil
+
+        Task {
+            do {
+                let endDate = Calendar.current.date(byAdding: .day, value: votingDays, to: Date()) ?? Date()
+
+                _ = try await ProposalAPIService.shared.createProposal(
+                    title: title,
+                    description: description,
+                    category: selectedCategory,
+                    proposerId: user.id,
+                    proposerName: user.displayName,
+                    endDate: endDate
+                )
+
+                await MainActor.run {
+                    isSubmitting = false
+                    showSuccess = true
+                    HapticFeedback.notification(.success)
+                }
+            } catch {
+                await MainActor.run {
+                    isSubmitting = false
+                    errorMessage = "Failed to submit proposal. Please try again."
+                    HapticFeedback.notification(.error)
+                }
+            }
+        }
+    }
+}
+
+// Custom TextField Style for Proposals
+struct ProposalTextFieldStyle: TextFieldStyle {
+    func _body(configuration: TextField<Self._Label>) -> some View {
+        configuration
+            .padding(14)
+            .background(Color.white)
+            .cornerRadius(12)
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(hex: "e5e7eb"), lineWidth: 1))
     }
 }
 

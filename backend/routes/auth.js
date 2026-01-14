@@ -92,6 +92,40 @@ router.post('/register', async (req, res) => {
 
         await user.save();
 
+        // Auto-follow the official AGA account
+        const AGA_OFFICIAL_ID = 'aga-official'; // Official AGA account user ID
+        try {
+            // Find or create the official AGA account
+            let agaAccount = await User.findOne({
+                $or: [
+                    { userId: AGA_OFFICIAL_ID },
+                    { username: 'aga-official' },
+                    { role: 'admin' }
+                ]
+            });
+
+            if (agaAccount) {
+                // Add AGA to user's following list
+                if (!user.following.includes(agaAccount.userId)) {
+                    user.following.push(agaAccount.userId);
+                    user.followingCount = user.following.length;
+                    await user.save();
+                }
+
+                // Add user to AGA's followers list
+                if (!agaAccount.followers.includes(user.userId)) {
+                    agaAccount.followers.push(user.userId);
+                    agaAccount.followersCount = agaAccount.followers.length;
+                    await agaAccount.save();
+                }
+
+                console.log(`Auto-followed AGA Official for new user: ${user.username}`);
+            }
+        } catch (followError) {
+            console.error('Auto-follow AGA failed (non-critical):', followError);
+            // Non-critical error, continue with registration
+        }
+
         // Return user without password hash
         const userResponse = user.toObject();
         delete userResponse.passwordHash;

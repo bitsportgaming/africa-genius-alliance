@@ -68,24 +68,27 @@ class PostAPIService {
     private init() {}
     
     // MARK: - Get Posts (Feed)
-    func getPosts(page: Int = 1, limit: Int = 20, authorId: String? = nil) async throws -> [APIPost] {
+    func getPosts(page: Int = 1, limit: Int = 20, authorId: String? = nil, userId: String? = nil, feedType: String? = nil) async throws -> [APIPost] {
         var urlString = "\(baseURL)/posts?page=\(page)&limit=\(limit)"
         if let authorId = authorId {
             urlString += "&authorId=\(authorId)"
         }
-        
+        if let userId = userId, let feedType = feedType {
+            urlString += "&userId=\(userId)&feedType=\(feedType)"
+        }
+
         guard let url = URL(string: urlString) else {
             throw APIError.invalidURL
         }
-        
+
         let (data, response) = try await URLSession.shared.data(from: url)
-        
+
         guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
             throw APIError.serverError
         }
-        
+
         let result = try JSONDecoder().decode(PaginatedResponse<APIPost>.self, from: data)
-        
+
         if result.success {
             return result.data
         } else {

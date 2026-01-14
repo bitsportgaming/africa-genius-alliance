@@ -13,16 +13,52 @@ struct TimelineFeedView: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var showCreatePost = false
-    
+    @State private var feedFilter: FeedFilter = .all
+
+    enum FeedFilter: String, CaseIterable, Identifiable {
+        case all = "All Posts"
+        case own = "My Posts"
+        case following = "Following"
+
+        var id: String { rawValue }
+    }
+
     var body: some View {
         NavigationStack {
-            ZStack {
-                Color(hex: "f9fafb").ignoresSafeArea()
-                
-                if isLoading && posts.isEmpty {
-                    ProgressView("Loading posts...")
-                        .foregroundColor(Color(hex: "6b7280"))
-                } else if let error = errorMessage, posts.isEmpty {
+            VStack(spacing: 0) {
+                // Feed Filter Picker
+                if authService.currentUser != nil {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 12) {
+                            ForEach(FeedFilter.allCases) { filter in
+                                Button(action: {
+                                    feedFilter = filter
+                                    Task { await loadPosts() }
+                                }) {
+                                    Text(filter.rawValue)
+                                        .font(.system(size: 14, weight: .medium))
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 8)
+                                        .background(feedFilter == filter ? Color(hex: "10b981") : Color(hex: "e5e7eb"))
+                                        .foregroundColor(feedFilter == filter ? .white : Color(hex: "6b7280"))
+                                        .cornerRadius(20)
+                                }
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                    }
+                    .background(Color.white)
+                    .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
+                }
+
+                ZStack {
+                    Color(hex: "f9fafb").ignoresSafeArea()
+
+                    if isLoading && posts.isEmpty {
+                        ProgressView("Loading posts...")
+                            .foregroundColor(Color(hex: "6b7280"))
+                    } else if let error = errorMessage, posts.isEmpty {
                     VStack(spacing: 16) {
                         Image(systemName: "wifi.slash")
                             .font(.system(size: 48))
@@ -63,39 +99,57 @@ struct TimelineFeedView: View {
                         }
                         .padding(16)
                     }
-                    .refreshable {
-                        await loadPosts()
+                        .refreshable {
+                            await loadPosts()
+                        }
                     }
                 }
-            }
-            .navigationTitle("Timeline")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: { showCreatePost = true }) {
-                        Image(systemName: "square.and.pencil")
-                            .foregroundColor(Color(hex: "10b981"))
+                .navigationTitle("Timeline")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button(action: { showCreatePost = true }) {
+                            Image(systemName: "square.and.pencil")
+                                .foregroundColor(Color(hex: "10b981"))
+                        }
                     }
                 }
-            }
-            .sheet(isPresented: $showCreatePost) {
-                CreatePostSheet()
-                    .onDisappear {
-                        Task { await loadPosts() }
-                    }
+                .sheet(isPresented: $showCreatePost) {
+                    CreatePostSheet()
+                        .onDisappear {
+                            Task { await loadPosts() }
+                        }
+                }
             }
         }
         .task {
             await loadPosts()
         }
     }
-    
+
     private func loadPosts() async {
         isLoading = true
         errorMessage = nil
-        
+
         do {
-            posts = try await PostAPIService.shared.getPosts()
+            // Apply feed filter
+            let userId = authService.currentUser?.id
+            switch feedFilter {
+            case .all:
+                posts = try await PostAPIService.shared.getPosts()
+            case .own:
+                if let userId = userId {
+                    posts = try await PostAPIService.shared.getPosts(userId: userId, feedType: "own")
+                } else {
+                    posts = []
+                }
+            case .following:
+                if let userId = userId {
+                    posts = try await PostAPIService.shared.getPosts(userId: userId, feedType: "following")
+                } else {
+                    posts = []
+                }
+            }
             isLoading = false
         } catch {
             errorMessage = error.localizedDescription

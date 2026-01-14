@@ -26,12 +26,12 @@ struct ModernPostCardView: View {
                 ZStack(alignment: .bottomLeading) {
                     // Main image with watermark
                     ZStack {
-                        PostImageView(imageName: imageURLs.first ?? "")
-                            .frame(minHeight: 200, maxHeight: 400)
+                        PostImageView(imageURL: imageURLs.first ?? "")
+                            .frame(height: 450)  // Instagram-size height
                             .frame(maxWidth: .infinity)
 
                         // AGA Watermark
-                        AGAWatermark(opacity: 0.12, fontSize: 22, color: .white)
+                        AGAWatermark(opacity: 0.15, fontSize: 24, color: .white)
                     }
                     .clipped()
 
@@ -293,30 +293,41 @@ private func createSamplePost() -> Post? {
 
 // MARK: - Post Image View
 struct PostImageView: View {
-    let imageName: String
+    let imageURL: String
+    @State private var loadedImage: UIImage?
+    @State private var isLoading = true
 
     var body: some View {
         ZStack {
-            // Try to load actual image, fallback to gradient placeholder
-            if let uiImage = UIImage(named: imageName) {
-                Image(uiImage: uiImage)
+            if let loadedImage = loadedImage {
+                // Display loaded remote image
+                Image(uiImage: loadedImage)
                     .resizable()
-                    .scaledToFit()
+                    .scaledToFill()
                     .frame(maxWidth: .infinity)
-                    .cornerRadius(AppConstants.cornerRadius)
+            } else if isLoading {
+                // Loading placeholder
+                LinearGradient(
+                    colors: [Color(hex: "667eea"), Color(hex: "764ba2")],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .overlay(
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        .scaleEffect(1.5)
+                )
             } else {
-                // Gradient background with placeholder icon
-                gradientForImage(imageName)
+                // Error placeholder
+                gradientForImage(imageURL)
                     .frame(maxWidth: .infinity)
-                    .frame(minHeight: 200)
-                    .cornerRadius(AppConstants.cornerRadius)
                     .overlay(
                         VStack(spacing: 16) {
-                            Image(systemName: iconForImage(imageName))
+                            Image(systemName: "photo")
                                 .font(.system(size: 60, weight: .light))
                                 .foregroundColor(.white)
 
-                            Text(titleForImage(imageName))
+                            Text("Image not available")
                                 .font(DesignSystem.Typography.headline)
                                 .foregroundColor(.white.opacity(0.9))
                         }
@@ -324,6 +335,58 @@ struct PostImageView: View {
             }
         }
         .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
+        .task {
+            await loadImage()
+        }
+    }
+
+    private func loadImage() async {
+        // Construct full HTTPS URL
+        var urlString = imageURL
+
+        // If it's a relative path, prepend the base URL
+        if urlString.starts(with: "/") {
+            urlString = "https://africageniusalliance.com\(urlString)"
+        }
+        // If it starts with http://, convert to https://
+        else if urlString.starts(with: "http://") {
+            urlString = urlString.replacingOccurrences(of: "http://", with: "https://")
+        }
+        // If no protocol, assume it needs the base URL
+        else if !urlString.starts(with: "https://") && !urlString.starts(with: "http://") {
+            urlString = "https://africageniusalliance.com/\(urlString)"
+        }
+
+        print("📷 Loading image from: \(urlString)")
+
+        guard let url = URL(string: urlString) else {
+            print("❌ Invalid URL: \(urlString)")
+            await MainActor.run {
+                self.isLoading = false
+            }
+            return
+        }
+
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            if let image = UIImage(data: data) {
+                print("✅ Successfully loaded image")
+                await MainActor.run {
+                    self.loadedImage = image
+                    self.isLoading = false
+                }
+            } else {
+                print("❌ Failed to decode image data")
+                await MainActor.run {
+                    self.isLoading = false
+                }
+            }
+        } catch {
+            print("❌ Error loading image from \(urlString): \(error)")
+            await MainActor.run {
+                self.isLoading = false
+            }
+        }
     }
 
     private func gradientForImage(_ name: String) -> LinearGradient {

@@ -154,6 +154,40 @@ struct SlideInModifier: ViewModifier {
     }
 }
 
+// MARK: - UIImage Extensions
+
+extension UIImage {
+    /// Add "Africa Genius Alliance" watermark to image
+    func withWatermark() -> UIImage? {
+        let renderer = UIGraphicsImageRenderer(size: size)
+
+        return renderer.image { context in
+            // Draw original image
+            draw(at: .zero)
+
+            // Configure watermark text
+            let watermarkText = "Africa Genius Alliance"
+            let attributes: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: 24, weight: .bold),
+                .foregroundColor: UIColor.white.withAlphaComponent(0.15)
+            ]
+
+            // Calculate text size
+            let attributedString = NSAttributedString(string: watermarkText, attributes: attributes)
+            let textSize = attributedString.size()
+
+            // Position watermark at bottom right
+            let padding: CGFloat = 20
+            let x = size.width - textSize.width - padding
+            let y = size.height - textSize.height - padding
+            let textRect = CGRect(x: x, y: y, width: textSize.width, height: textSize.height)
+
+            // Draw watermark
+            watermarkText.draw(in: textRect, withAttributes: attributes)
+        }
+    }
+}
+
 // MARK: - Haptic Feedback Helper
 
 enum HapticFeedback {

@@ -149,13 +149,18 @@ export const Footer: React.FC = () => {
             <ul className="space-y-3 text-white/70">
               <li className="flex items-start gap-2">
                 <Mail className="w-5 h-5 mt-0.5 flex-shrink-0" />
-                <a href="mailto:hello@aga.africa" className="hover:text-secondary transition-colors">
-                  hello@aga.africa
+                <a href="mailto:official@africageniusalliance.com" className="hover:text-secondary transition-colors">
+                  official@africageniusalliance.com
                 </a>
               </li>
               <li className="flex items-start gap-2">
                 <MapPin className="w-5 h-5 mt-0.5 flex-shrink-0" />
                 <span>Pan-African Initiative</span>
+              </li>
+              <li>
+                <Link href="/volunteer" className="hover:text-secondary transition-colors">
+                  Volunteer With Us
+                </Link>
               </li>
             </ul>
           </div>

@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { AGAButton } from '@/components/ui';
 import { ArrowRight, Sparkles } from 'lucide-react';
 
@@ -16,6 +17,18 @@ export const HeroSection: React.FC = () => {
 
       <div className="relative z-10 container mx-auto px-4 py-20 md:py-32">
         <div className="max-w-5xl mx-auto text-center">
+          {/* Logo */}
+          <div className="flex justify-center mb-8">
+            <Image
+              src="/aga.png"
+              alt="Africa Genius Alliance Logo"
+              width={200}
+              height={200}
+              className="w-32 h-32 md:w-48 md:h-48 object-contain"
+              priority
+            />
+          </div>
+
           {/* Badge */}
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 text-white mb-8">
             <Sparkles className="w-4 h-4" />

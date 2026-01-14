@@ -568,7 +568,7 @@ export function SupporterDashboard() {
                     {post.content}
                   </p>
 
-                  {/* Post Images - Compact */}
+                  {/* Post Images */}
                   {post.mediaURLs && post.mediaURLs.length > 0 && (
                     <div className="mb-3 rounded-lg overflow-hidden border border-gray-100">
                       {post.mediaURLs.length === 1 ? (
@@ -576,7 +576,7 @@ export function SupporterDashboard() {
                           <img
                             src={`${process.env.NEXT_PUBLIC_API_URL || 'https://africageniusalliance.com'}${post.mediaURLs[0]}`}
                             alt="Post image"
-                            className="w-full h-auto max-h-[300px] object-cover"
+                            className="w-full h-auto max-h-[450px] object-cover"
                           />
                           <div className="absolute bottom-2 right-2 text-white/20 font-semibold text-sm pointer-events-none select-none">
                             Africa Genius Alliance
@@ -589,7 +589,7 @@ export function SupporterDashboard() {
                               <img
                                 src={`${process.env.NEXT_PUBLIC_API_URL || 'https://africageniusalliance.com'}${url}`}
                                 alt={`Post image ${index + 1}`}
-                                className="w-full h-32 object-cover"
+                                className="w-full h-48 object-cover"
                               />
                               {index === 3 && post.mediaURLs!.length > 4 && (
                                 <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-white text-lg font-bold">

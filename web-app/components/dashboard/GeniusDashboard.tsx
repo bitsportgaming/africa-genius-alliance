@@ -513,13 +513,11 @@ export function GeniusDashboard() {
       )}
 
       {/* Feed Section */}
-      <section className="max-w-xl">
-        <h2 className="text-xl font-bold text-text-dark mb-4">Your Feed</h2>
-
-        {/* Compact Twitter-style feed container */}
-        <div>
+      <section>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-2xl font-bold text-text-dark">Your Feed</h2>
           {/* Feed Filter Tabs */}
-          <div className="flex gap-2 mb-4">
+          <div className="flex gap-2">
             <button
               onClick={() => setFeedView('own')}
               className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
@@ -541,6 +539,10 @@ export function GeniusDashboard() {
               All Posts
             </button>
           </div>
+        </div>
+
+        {/* Centered feed container - matching supporter dashboard */}
+        <div className="max-w-2xl mx-auto">
 
           {/* Feed Posts */}
           {feedLoading ? (
@@ -600,26 +602,31 @@ export function GeniusDashboard() {
                       {post.content}
                     </p>
 
-                    {/* Post Images - Compact */}
+                    {/* Post Images */}
                     {post.mediaURLs && post.mediaURLs.length > 0 && (
-                      <div className="mb-3 rounded-xl overflow-hidden border border-gray-100">
+                      <div className="mb-3 rounded-lg overflow-hidden border border-gray-100">
                         {post.mediaURLs.length === 1 ? (
-                          <img
-                            src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}${post.mediaURLs[0]}`}
-                            alt="Post media"
-                            className="w-full h-auto max-h-[200px] object-cover"
-                          />
+                          <div className="relative">
+                            <img
+                              src={`${process.env.NEXT_PUBLIC_API_URL || 'https://africageniusalliance.com'}${post.mediaURLs[0]}`}
+                              alt="Post media"
+                              className="w-full h-auto max-h-[450px] object-cover"
+                            />
+                            <div className="absolute bottom-2 right-2 text-white/20 font-semibold text-sm pointer-events-none select-none">
+                              Africa Genius Alliance
+                            </div>
+                          </div>
                         ) : (
                           <div className="grid grid-cols-2 gap-0.5">
                             {post.mediaURLs.slice(0, 4).map((url, index) => (
                               <div key={index} className="relative">
                                 <img
-                                  src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}${url}`}
+                                  src={`${process.env.NEXT_PUBLIC_API_URL || 'https://africageniusalliance.com'}${url}`}
                                   alt={`Post media ${index + 1}`}
-                                  className="w-full h-24 object-cover"
+                                  className="w-full h-48 object-cover"
                                 />
                                 {index === 3 && post.mediaURLs!.length > 4 && (
-                                  <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-white text-sm font-bold">
+                                  <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-white text-lg font-bold">
                                     +{post.mediaURLs!.length - 4}
                                   </div>
                                 )}

@@ -9,7 +9,7 @@ import { Vote as VoteIcon, Trophy, Users, Calendar, ChevronRight, CheckCircle, E
 import { ElectionCard } from '@/components/vote/ElectionCard';
 import { VotingModal } from '@/components/vote/VotingModal';
 import { votingAPI } from '@/lib/api';
-import { useAuth } from '@/lib/auth/AuthContext';
+import { useAuth } from '@/lib/store/auth-store';
 
 export default function VotePage() {
   const { user } = useAuth();

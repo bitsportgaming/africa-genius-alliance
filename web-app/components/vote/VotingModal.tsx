@@ -5,7 +5,7 @@ import { AGACard, AGAButton, AGAPill } from '@/components/ui';
 import { X, Vote, CheckCircle, AlertCircle, ExternalLink, Link as LinkIcon } from 'lucide-react';
 import { votingAPI } from '@/lib/api';
 import { Election, ElectionCandidate } from '@/types';
-import { useAuth } from '@/lib/auth/AuthContext';
+import { useAuth } from '@/lib/store/auth-store';
 
 interface VotingModalProps {
   election: Election;

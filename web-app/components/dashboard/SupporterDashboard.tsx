@@ -14,10 +14,11 @@ import {
   ShieldCheck,
   Loader2,
   Radio,
-  Eye
+  Eye,
+  Send
 } from 'lucide-react';
-import { useState, useEffect, useCallback } from 'react';
-import { apiClient, usersAPI, postsAPI, liveAPI, LiveStream } from '@/lib/api';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { apiClient, usersAPI, postsAPI, liveAPI, commentsAPI, LiveStream } from '@/lib/api';
 
 interface SupporterStats {
   supporterStats: {
@@ -55,6 +56,10 @@ export function SupporterDashboard() {
   const [followingUsers, setFollowingUsers] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(1);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
+  const [commentInputs, setCommentInputs] = useState<Record<string, string>>({});
+  const [submittingComment, setSubmittingComment] = useState<string | null>(null);
+  const commentInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -119,9 +124,9 @@ export function SupporterDashboard() {
     return () => clearInterval(interval);
   }, [user?._id]);
 
-  // Refetch posts when filter changes
+  // Refetch posts when filter changes + real-time polling for likes/comments
   useEffect(() => {
-    const fetchFilteredPosts = async () => {
+    const fetchFilteredPosts = async (isPolling = false) => {
       if (!user?._id) return;
       try {
         const params: any = { page: 1, limit: 10 };
@@ -147,14 +152,40 @@ export function SupporterDashboard() {
             createdAt: new Date().toISOString(),
             isAdminPost: true,
           };
-          setFeedPosts([adminPost, ...(Array.isArray(postsResponse.data) ? postsResponse.data : [])]);
-          setPage(1);
+          const newPosts = [adminPost, ...(Array.isArray(postsResponse.data) ? postsResponse.data : [])];
+
+          // If polling, only update likes/comments counts without resetting scroll position
+          if (isPolling) {
+            setFeedPosts(prev => {
+              return newPosts.map(newPost => {
+                const existingPost = prev.find(p => p._id === newPost._id);
+                if (existingPost) {
+                  // Preserve local optimistic updates for likes
+                  return {
+                    ...newPost,
+                    likesCount: newPost.likesCount,
+                    commentsCount: newPost.commentsCount,
+                    likedBy: newPost.likedBy,
+                  };
+                }
+                return newPost;
+              });
+            });
+          } else {
+            setFeedPosts(newPosts);
+            setPage(1);
+          }
         }
       } catch (err) {
         console.error('Failed to fetch filtered posts:', err);
       }
     };
-    fetchFilteredPosts();
+
+    fetchFilteredPosts(false);
+
+    // Poll every 15 seconds for real-time updates
+    const pollInterval = setInterval(() => fetchFilteredPosts(true), 15000);
+    return () => clearInterval(pollInterval);
   }, [feedFilter, user?._id]);
 
   const quickStats = {
@@ -275,6 +306,59 @@ export function SupporterDashboard() {
       }
     }
   }, []);
+
+  // Toggle comment input visibility
+  const toggleCommentInput = useCallback((postId: string) => {
+    setExpandedComments(prev => {
+      const next = new Set(prev);
+      if (next.has(postId)) {
+        next.delete(postId);
+      } else {
+        next.add(postId);
+        // Focus the input after state update
+        setTimeout(() => {
+          commentInputRefs.current[postId]?.focus();
+        }, 100);
+      }
+      return next;
+    });
+  }, []);
+
+  // Handle comment submit
+  const handleCommentSubmit = useCallback(async (postId: string) => {
+    if (!user?._id || postId === 'admin-welcome' || submittingComment) return;
+    const content = commentInputs[postId]?.trim();
+    if (!content) return;
+
+    setSubmittingComment(postId);
+    try {
+      const res = await commentsAPI.createComment({
+        postId,
+        content,
+        authorId: user._id,
+        authorName: user.displayName || 'Anonymous',
+        authorAvatar: user.avatarURL,
+      });
+      if (res.success) {
+        // Update comment count
+        setFeedPosts(prev => prev.map(post =>
+          post._id === postId ? { ...post, commentsCount: post.commentsCount + 1 } : post
+        ));
+        // Clear input
+        setCommentInputs(prev => ({ ...prev, [postId]: '' }));
+        // Close comment input after successful submission
+        setExpandedComments(prev => {
+          const next = new Set(prev);
+          next.delete(postId);
+          return next;
+        });
+      }
+    } catch (err) {
+      console.error('Failed to post comment:', err);
+    } finally {
+      setSubmittingComment(null);
+    }
+  }, [user, commentInputs, submittingComment]);
 
   if (loading && !stats) {
     return (
@@ -615,13 +699,17 @@ export function SupporterDashboard() {
                       <Heart className={`w-4 h-4 ${post.likedBy.includes(user?._id || '') ? 'fill-current' : ''}`} />
                       <span className="text-xs font-medium">{post.likesCount}</span>
                     </button>
-                    <Link
-                      href={`/post/${post._id}`}
-                      className="flex items-center gap-1.5 px-2 py-1 rounded-full text-text-gray hover:text-primary hover:bg-primary/10 transition-colors"
+                    <button
+                      onClick={() => toggleCommentInput(post._id)}
+                      className={`flex items-center gap-1.5 px-2 py-1 rounded-full transition-colors ${
+                        expandedComments.has(post._id)
+                          ? 'text-primary bg-primary/10'
+                          : 'text-text-gray hover:text-primary hover:bg-primary/10'
+                      }`}
                     >
                       <MessageCircle className="w-4 h-4" />
                       <span className="text-xs font-medium">{post.commentsCount}</span>
-                    </Link>
+                    </button>
                     <div className="flex items-center gap-1.5 px-2 py-1 rounded-full text-text-gray hover:text-green-500 hover:bg-green-50 transition-colors">
                       <ShareMenu
                         postId={post._id}
@@ -631,6 +719,49 @@ export function SupporterDashboard() {
                       <span className="text-xs font-medium">{post.sharesCount}</span>
                     </div>
                   </div>
+
+                  {/* Inline Comment Input */}
+                  {expandedComments.has(post._id) && post._id !== 'admin-welcome' && (
+                    <div className="mt-3 pt-3 border-t border-gray-100">
+                      <div className="flex gap-2 items-center">
+                        <div className="w-8 h-8 rounded-full bg-gradient-accent flex items-center justify-center text-white text-xs font-semibold flex-shrink-0">
+                          {user?.displayName?.[0]?.toUpperCase() || 'U'}
+                        </div>
+                        <div className="flex-1 flex gap-2">
+                          <input
+                            ref={(el) => { commentInputRefs.current[post._id] = el; }}
+                            type="text"
+                            value={commentInputs[post._id] || ''}
+                            onChange={(e) => setCommentInputs(prev => ({ ...prev, [post._id]: e.target.value }))}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault();
+                                handleCommentSubmit(post._id);
+                              }
+                            }}
+                            placeholder="Write a comment..."
+                            className="flex-1 px-3 py-2 text-sm rounded-full border border-gray-200 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
+                          />
+                          <button
+                            onClick={() => handleCommentSubmit(post._id)}
+                            disabled={!commentInputs[post._id]?.trim() || submittingComment === post._id}
+                            className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary/90 transition-colors"
+                          >
+                            {submittingComment === post._id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Send className="w-4 h-4" />
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                      <div className="mt-2 text-right">
+                        <Link href={`/post/${post._id}`} className="text-xs text-primary hover:underline">
+                          View all comments →
+                        </Link>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}

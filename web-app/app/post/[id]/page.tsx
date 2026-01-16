@@ -92,7 +92,8 @@ export default function PostDetailPage() {
         authorAvatar: user.profileImageURL,
       });
       if (res.success && res.data) {
-        setComments(prev => [res.data, ...prev]);
+        const newComment = res.data;
+        setComments(prev => [newComment, ...prev]);
         setPost(prev => prev ? { ...prev, commentsCount: prev.commentsCount + 1 } : null);
         setNewComment('');
       }

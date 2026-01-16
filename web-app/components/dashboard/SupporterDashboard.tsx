@@ -337,7 +337,7 @@ export function SupporterDashboard() {
         content,
         authorId: user._id,
         authorName: user.displayName || 'Anonymous',
-        authorAvatar: user.avatarURL,
+        authorAvatar: user.profileImageURL,
       });
       if (res.success) {
         // Update comment count

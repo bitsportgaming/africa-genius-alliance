@@ -89,7 +89,7 @@ export default function PostDetailPage() {
         content: newComment.trim(),
         authorId: user._id,
         authorName: user.displayName || 'Anonymous',
-        authorAvatar: user.avatarURL,
+        authorAvatar: user.profileImageURL,
       });
       if (res.success && res.data) {
         setComments(prev => [res.data, ...prev]);

@@ -2,11 +2,37 @@ const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
 const crypto = require('crypto');
+const multer = require('multer');
+const path = require('path');
 
 // Helper function to generate unique ID
 function generateUniqueId() {
     return crypto.randomBytes(16).toString('hex');
 }
+
+// Configure multer for verification document uploads
+const verificationStorage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, 'uploads/');
+    },
+    filename: (req, file, cb) => {
+        const uniqueName = `verification-${generateUniqueId()}${path.extname(file.originalname)}`;
+        cb(null, uniqueName);
+    }
+});
+
+const verificationUpload = multer({
+    storage: verificationStorage,
+    fileFilter: (req, file, cb) => {
+        const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+        if (allowedTypes.includes(file.mimetype)) {
+            cb(null, true);
+        } else {
+            cb(new Error('Invalid file type. Only JPEG, PNG, and WebP images are allowed.'), false);
+        }
+    },
+    limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
+});
 
 // GET /api/users/geniuses - Get geniuses by category
 router.get('/geniuses', async (req, res) => {
@@ -194,7 +220,19 @@ router.get('/:userId/stats', async (req, res) => {
     }
 });
 
-// POST /api/users/:userId/vote - Vote for a genius
+/**
+ * POST /api/users/:userId/vote - Upvote a genius
+ *
+ * This is for UPVOTING geniuses to increase their ranking/popularity.
+ * This is NOT for formal election voting - use /api/elections/:id/vote for that.
+ *
+ * Upvoting is used for:
+ * - General support of a genius on the platform
+ * - Genius ranking/leaderboard positioning
+ * - Expressing support without a formal election context
+ *
+ * Unlike election voting (which is 1 vote per election), upvoting can be done multiple times.
+ */
 router.post('/:userId/vote', async (req, res) => {
     try {
         const { voterId } = req.body;
@@ -309,11 +347,116 @@ router.post('/:userId/follow', async (req, res) => {
 
         await Promise.all([follower.save(), targetUser.save()]);
 
-        res.json({ 
-            success: true, 
+        res.json({
+            success: true,
             following: !isFollowing,
             targetUser,
             follower
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// POST /api/users/:userId/verification - Submit verification documents
+router.post('/:userId/verification', verificationUpload.fields([
+    { name: 'idFront', maxCount: 1 },
+    { name: 'idBack', maxCount: 1 }
+]), async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const { fullName, dateOfBirth } = req.body;
+
+        // Find user
+        let user = await User.findOne({ userId });
+        if (!user) {
+            try {
+                user = await User.findById(userId);
+            } catch (e) {
+                // Invalid ObjectId format
+            }
+        }
+
+        if (!user) {
+            return res.status(404).json({ success: false, error: 'User not found' });
+        }
+
+        // Validate required fields
+        if (!fullName || !dateOfBirth) {
+            return res.status(400).json({
+                success: false,
+                error: 'Full name and date of birth are required'
+            });
+        }
+
+        // Get file URLs
+        const idFrontURL = req.files?.idFront?.[0]
+            ? `/uploads/${req.files.idFront[0].filename}`
+            : null;
+        const idBackURL = req.files?.idBack?.[0]
+            ? `/uploads/${req.files.idBack[0].filename}`
+            : null;
+
+        if (!idFrontURL) {
+            return res.status(400).json({
+                success: false,
+                error: 'Front of ID document is required'
+            });
+        }
+
+        // Update user verification data
+        user.verification = {
+            fullName,
+            dateOfBirth: new Date(dateOfBirth),
+            idFrontURL,
+            idBackURL,
+            submittedAt: new Date(),
+            reviewedAt: null,
+            reviewedBy: null,
+            rejectionReason: ''
+        };
+        user.verificationStatus = 'pending';
+        await user.save();
+
+        res.json({
+            success: true,
+            message: 'Verification documents submitted successfully',
+            data: {
+                verificationStatus: user.verificationStatus,
+                submittedAt: user.verification.submittedAt
+            }
+        });
+    } catch (error) {
+        console.error('Verification submission error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// GET /api/users/:userId/verification - Get verification status
+router.get('/:userId/verification', async (req, res) => {
+    try {
+        const { userId } = req.params;
+
+        // Find user
+        let user = await User.findOne({ userId });
+        if (!user) {
+            try {
+                user = await User.findById(userId);
+            } catch (e) {
+                // Invalid ObjectId format
+            }
+        }
+
+        if (!user) {
+            return res.status(404).json({ success: false, error: 'User not found' });
+        }
+
+        res.json({
+            success: true,
+            data: {
+                verificationStatus: user.verificationStatus || 'unverified',
+                verification: user.verification || null
+            }
         });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });

@@ -130,7 +130,23 @@ const userSchema = new mongoose.Schema({
     }],
     followers: [{
         type: String
-    }]
+    }],
+    // Verification fields
+    verificationStatus: {
+        type: String,
+        enum: ['unverified', 'pending', 'verified', 'rejected'],
+        default: 'unverified'
+    },
+    verification: {
+        fullName: { type: String, default: '' },
+        dateOfBirth: { type: Date, default: null },
+        idFrontURL: { type: String, default: null },
+        idBackURL: { type: String, default: null },
+        submittedAt: { type: Date, default: null },
+        reviewedAt: { type: Date, default: null },
+        reviewedBy: { type: String, default: null },
+        rejectionReason: { type: String, default: '' }
+    }
 }, {
     timestamps: true
 });

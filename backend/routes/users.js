@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
+const Vote = require('../models/Vote');
+const GeniusWaitlist = require('../models/GeniusWaitlist');
 const crypto = require('crypto');
 const multer = require('multer');
 const path = require('path');
@@ -32,6 +34,103 @@ const verificationUpload = multer({
         }
     },
     limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
+});
+
+// POST /api/users/genius-waitlist - Join the genius waitlist
+router.post('/genius-waitlist', async (req, res) => {
+    try {
+        const { userId, email, displayName } = req.body;
+
+        // Validate required fields
+        if (!userId || !email) {
+            return res.status(400).json({
+                success: false,
+                error: 'userId and email are required'
+            });
+        }
+
+        // Check if already on waitlist
+        const existingEntry = await GeniusWaitlist.findOne({
+            $or: [{ userId }, { email: email.toLowerCase() }]
+        });
+
+        if (existingEntry) {
+            // Already on waitlist - return success (idempotent)
+            return res.status(200).json({
+                success: true,
+                message: 'Already on the genius waitlist',
+                data: {
+                    submittedAt: existingEntry.submittedAt,
+                    status: existingEntry.status
+                }
+            });
+        }
+
+        // Create new waitlist entry
+        const waitlistEntry = new GeniusWaitlist({
+            userId,
+            email: email.toLowerCase(),
+            displayName: displayName || 'Unknown',
+            status: 'pending',
+            submittedAt: new Date()
+        });
+
+        await waitlistEntry.save();
+
+        console.log(`[Waitlist] New genius waitlist entry: ${email}`);
+
+        // Return success response
+        res.status(201).json({
+            success: true,
+            message: 'Successfully joined the genius waitlist',
+            data: {
+                submittedAt: waitlistEntry.submittedAt,
+                status: waitlistEntry.status
+            }
+        });
+    } catch (error) {
+        console.error('Genius waitlist error:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message || 'Failed to join waitlist'
+        });
+    }
+});
+
+// GET /api/users/search - Search geniuses by name, position, bio, or country
+router.get('/search', async (req, res) => {
+    try {
+        const { q, limit = 20 } = req.query;
+
+        if (!q || q.trim().length === 0) {
+            return res.json({ success: true, data: [] });
+        }
+
+        const searchQuery = q.trim();
+
+        // Search across multiple fields (case-insensitive)
+        const geniuses = await User.find({
+            role: 'genius',
+            $or: [
+                { displayName: { $regex: searchQuery, $options: 'i' } },
+                { username: { $regex: searchQuery, $options: 'i' } },
+                { positionTitle: { $regex: searchQuery, $options: 'i' } },
+                { positionCategory: { $regex: searchQuery, $options: 'i' } },
+                { bio: { $regex: searchQuery, $options: 'i' } },
+                { country: { $regex: searchQuery, $options: 'i' } }
+            ]
+        })
+            .sort({ votesReceived: -1 })
+            .limit(parseInt(limit))
+            .select('-passwordHash -email'); // Exclude sensitive fields
+
+        console.log(`[Search] Query: "${searchQuery}", Found: ${geniuses.length} results`);
+
+        res.json({ success: true, data: geniuses });
+    } catch (error) {
+        console.error('Search error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
 });
 
 // GET /api/users/geniuses - Get geniuses by category
@@ -263,6 +362,27 @@ router.post('/:userId/vote', async (req, res) => {
         if (targetUser.role !== 'genius') {
             return res.status(400).json({ success: false, error: 'Can only vote for geniuses' });
         }
+
+        // Check if already voted (for one-vote-per-genius limit)
+        const existingVote = await Vote.findOne({
+            voterId,
+            targetId: targetUser.userId,
+            targetType: 'genius'
+        });
+
+        if (existingVote) {
+            return res.status(400).json({ success: false, error: 'Already voted for this genius' });
+        }
+
+        // Create Vote record for history tracking
+        const vote = new Vote({
+            voterId,
+            targetId: targetUser.userId,
+            targetType: 'genius',
+            outcome: 'voted',
+            category: targetUser.positionCategory || 'general'
+        });
+        await vote.save();
 
         // Increment votes received for target
         targetUser.votesReceived = (targetUser.votesReceived || 0) + 1;

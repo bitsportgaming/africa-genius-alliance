@@ -23,19 +23,29 @@ const storage = multer.diskStorage({
 
 const fileFilter = (req, file, cb) => {
     const allowedImageTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-    const allowedVideoTypes = ['video/mp4', 'video/quicktime', 'video/x-m4v'];
-    
+    const allowedVideoTypes = [
+        'video/mp4',
+        'video/quicktime',
+        'video/x-m4v',
+        'video/avi',
+        'video/x-matroska',
+        'video/webm',
+        'video/3gpp',
+        'video/x-msvideo'
+    ];
+
     if (allowedImageTypes.includes(file.mimetype) || allowedVideoTypes.includes(file.mimetype)) {
         cb(null, true);
     } else {
-        cb(new Error('Invalid file type. Only images and videos are allowed.'), false);
+        console.log('Rejected file with mimetype:', file.mimetype);
+        cb(new Error(`Invalid file type: ${file.mimetype}. Only images and videos are allowed.`), false);
     }
 };
 
 const upload = multer({
     storage,
     fileFilter,
-    limits: { fileSize: 50 * 1024 * 1024 } // 50MB limit
+    limits: { fileSize: 500 * 1024 * 1024 } // 500MB limit for videos
 });
 
 // GET /api/posts - Get all posts (feed)
@@ -43,6 +53,8 @@ router.get('/', async (req, res) => {
     try {
         const { page = 1, limit = 20, authorId, userId, feedType = 'all' } = req.query;
         const query = { isActive: true };
+
+        console.log('📝 Posts API called with:', { authorId, userId, feedType });
 
         // Filter by specific author
         if (authorId) {
@@ -57,10 +69,14 @@ router.get('/', async (req, res) => {
                 // Show posts from users they follow
                 const User = require('../models/User');
                 const user = await User.findOne({ userId });
+                console.log('📝 User found for following filter:', user ? { userId: user.userId, following: user.following } : 'NOT FOUND');
+
                 if (user && user.following && user.following.length > 0) {
                     query.authorId = { $in: user.following };
+                    console.log('📝 Filtering posts by authorIds:', user.following);
                 } else {
                     // If not following anyone, return empty array
+                    console.log('📝 User not following anyone, returning empty array');
                     return res.json({
                         success: true,
                         data: [],
@@ -114,12 +130,12 @@ router.get('/:id', async (req, res) => {
 // POST /api/posts - Create a new post with optional media
 router.post('/', upload.array('media', 5), async (req, res) => {
     try {
-        const { authorId, authorName, authorAvatar, authorPosition, content } = req.body;
-        
+        const { authorId, authorName, authorAvatar, authorPosition, authorCountry, content } = req.body;
+
         if (!authorId || !content) {
-            return res.status(400).json({ 
-                success: false, 
-                error: 'authorId and content are required' 
+            return res.status(400).json({
+                success: false,
+                error: 'authorId and content are required'
             });
         }
 
@@ -144,6 +160,7 @@ router.post('/', upload.array('media', 5), async (req, res) => {
             authorName: authorName || 'Anonymous',
             authorAvatar: authorAvatar || null,
             authorPosition: authorPosition || '',
+            authorCountry: authorCountry || '',
             content,
             mediaURLs,
             mediaType,

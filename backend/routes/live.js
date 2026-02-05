@@ -28,6 +28,36 @@ router.get('/host/:hostId', async (req, res) => {
     }
 });
 
+// GET /api/live/host/:hostId/scheduled - Get scheduled live streams for a host
+router.get('/host/:hostId/scheduled', async (req, res) => {
+    try {
+        const streams = await LiveStream.find({
+            hostId: req.params.hostId,
+            status: 'scheduled',
+            scheduledStartTime: { $gte: new Date() } // Only future scheduled streams
+        }).sort({ scheduledStartTime: 1 });
+        res.json({ success: true, data: streams });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// GET /api/live/host/:hostId/all - Get all streams (live and scheduled) for a host
+router.get('/host/:hostId/all', async (req, res) => {
+    try {
+        const streams = await LiveStream.find({
+            hostId: req.params.hostId,
+            $or: [
+                { status: 'live' },
+                { status: 'scheduled', scheduledStartTime: { $gte: new Date() } }
+            ]
+        }).sort({ status: 1, scheduledStartTime: 1 }); // Live first, then scheduled
+        res.json({ success: true, data: streams });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 // GET /api/live/:id - Get a specific live stream
 router.get('/:id', async (req, res) => {
     try {
@@ -36,6 +66,32 @@ router.get('/:id', async (req, res) => {
             return res.status(404).json({ success: false, error: 'Live stream not found' });
         }
         res.json({ success: true, data: stream });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// POST /api/live/schedule - Schedule a live stream for later
+router.post('/schedule', async (req, res) => {
+    try {
+        const { hostId, hostName, hostAvatar, hostPosition, title, description, category, tags, scheduledStartTime } = req.body;
+        if (!hostId || !hostName || !title || !scheduledStartTime) {
+            return res.status(400).json({ success: false, error: 'hostId, hostName, title, and scheduledStartTime are required' });
+        }
+
+        const scheduledDate = new Date(scheduledStartTime);
+        if (scheduledDate <= new Date()) {
+            return res.status(400).json({ success: false, error: 'Scheduled time must be in the future' });
+        }
+
+        const streamKey = hostId + '-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+        const stream = new LiveStream({
+            hostId, hostName, hostAvatar, hostPosition, title,
+            description: description || '', category: category || 'general', tags: tags || [],
+            status: 'scheduled', scheduledStartTime: scheduledDate, streamKey
+        });
+        await stream.save();
+        res.status(201).json({ success: true, data: stream });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
     }

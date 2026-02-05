@@ -18,6 +18,10 @@ const postSchema = new mongoose.Schema({
         type: String,
         default: ''
     },
+    authorCountry: {
+        type: String,
+        default: ''
+    },
     content: {
         type: String,
         required: true,

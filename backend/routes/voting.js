@@ -52,7 +52,19 @@ router.get('/history/:userId', async (req, res) => {
     }
 });
 
-// POST /api/voting/genius - Vote for a genius
+/**
+ * POST /api/voting/genius - Upvote a genius
+ *
+ * This is for UPVOTING geniuses to increase their ranking/popularity.
+ * This is NOT for formal election voting - use /api/elections/:id/vote for that.
+ *
+ * Upvoting is used for:
+ * - General support of a genius on the platform
+ * - Genius ranking/leaderboard positioning
+ * - Expressing support without a formal election context
+ *
+ * One upvote per user per genius is allowed (unlike the general /api/users/:userId/vote endpoint).
+ */
 router.post('/genius', async (req, res) => {
     try {
         const { voterId, geniusId, category } = req.body;
@@ -133,33 +145,40 @@ router.post('/project', async (req, res) => {
 router.post('/proposal', async (req, res) => {
     try {
         const { voterId, proposalId, voteType } = req.body; // voteType: 'for', 'against', 'abstain'
-        
-        const existingVote = await Vote.findOne({ 
-            voterId, 
-            targetId: proposalId, 
-            targetType: 'proposal' 
+
+        if (!voterId || !proposalId || !voteType) {
+            return res.status(400).json({ success: false, error: 'Missing required fields: voterId, proposalId, voteType' });
+        }
+
+        const existingVote = await Vote.findOne({
+            voterId,
+            targetId: proposalId,
+            targetType: 'proposal'
         });
-        
+
         if (existingVote) {
             return res.status(400).json({ success: false, error: 'Already voted on this proposal' });
         }
-        
+
         const vote = new Vote({
             voterId,
             targetId: proposalId,
             targetType: 'proposal',
-            category: voteType
+            category: voteType,
+            outcome: voteType // Set outcome to the vote type (for, against, abstain)
         });
         await vote.save();
-        
-        const updateField = voteType === 'for' ? 'votesFor' : 
+
+        const updateField = voteType === 'for' ? 'votesFor' :
                            voteType === 'against' ? 'votesAgainst' : 'votesAbstain';
-        
+
         await Proposal.findOneAndUpdate(
             { proposalId },
             { $inc: { [updateField]: 1 } }
         );
-        
+
+        console.log(`✅ Vote recorded: ${voterId} voted ${voteType} on proposal ${proposalId}`);
+
         res.json({ success: true, data: vote });
     } catch (error) {
         console.error('Vote on proposal error:', error);

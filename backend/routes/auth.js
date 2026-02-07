@@ -232,14 +232,14 @@ router.get('/profile/:userId', async (req, res) => {
 // PUT /api/auth/profile/:userId - Update user profile
 router.put('/profile/:userId', async (req, res) => {
     try {
-        const { displayName, bio, country, profileImageURL, positionTitle } = req.body;
-        
+        const { displayName, bio, country, profileImageURL, positionTitle, socialLinks } = req.body;
+
         const user = await User.findOne({ userId: req.params.userId });
-        
+
         if (!user) {
-            return res.status(404).json({ 
-                success: false, 
-                error: 'User not found' 
+            return res.status(404).json({
+                success: false,
+                error: 'User not found'
             });
         }
 
@@ -249,6 +249,17 @@ router.put('/profile/:userId', async (req, res) => {
         if (country !== undefined) user.country = country;
         if (profileImageURL !== undefined) user.profileImageURL = profileImageURL;
         if (positionTitle !== undefined) user.positionTitle = positionTitle;
+
+        // Update social links
+        if (socialLinks !== undefined) {
+            if (!user.socialLinks) {
+                user.socialLinks = {};
+            }
+            if (socialLinks.twitter !== undefined) user.socialLinks.twitter = socialLinks.twitter;
+            if (socialLinks.instagram !== undefined) user.socialLinks.instagram = socialLinks.instagram;
+            if (socialLinks.linkedin !== undefined) user.socialLinks.linkedin = socialLinks.linkedin;
+            if (socialLinks.website !== undefined) user.socialLinks.website = socialLinks.website;
+        }
 
         await user.save();
 
@@ -335,7 +346,7 @@ router.post('/profile/:userId/image', upload.single('image'), async (req, res) =
         }
 
         // Build the public URL for the uploaded image
-        const imageURL = `${process.env.API_BASE_URL || 'https://api.globalgeniusalliance.org'}/uploads/profiles/${req.file.filename}`;
+        const imageURL = `${process.env.API_BASE_URL || 'https://africageniusalliance.com'}/uploads/profiles/${req.file.filename}`;
 
         // Update user's profile image URL
         user.profileImageURL = imageURL;
@@ -349,6 +360,65 @@ router.post('/profile/:userId/image', upload.single('image'), async (req, res) =
         res.json({ success: true, data: userResponse });
     } catch (error) {
         console.error('Profile image upload error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// POST /api/auth/change-password - Change user password
+router.post('/change-password', async (req, res) => {
+    try {
+        const { userId, currentPassword, newPassword } = req.body;
+
+        // Validate required fields
+        if (!userId || !currentPassword || !newPassword) {
+            return res.status(400).json({
+                success: false,
+                error: 'User ID, current password, and new password are required'
+            });
+        }
+
+        // Validate new password length
+        if (newPassword.length < 6) {
+            return res.status(400).json({
+                success: false,
+                error: 'New password must be at least 6 characters'
+            });
+        }
+
+        // Check if new password is same as current password
+        if (currentPassword === newPassword) {
+            return res.status(400).json({
+                success: false,
+                error: 'New password must be different from current password'
+            });
+        }
+
+        // Find user
+        const user = await User.findOne({ userId });
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                error: 'User not found'
+            });
+        }
+
+        // Verify current password
+        if (!verifyPassword(currentPassword, user.passwordHash)) {
+            return res.status(401).json({
+                success: false,
+                error: 'Current password is incorrect'
+            });
+        }
+
+        // Update password
+        user.passwordHash = hashPassword(newPassword);
+        await user.save();
+
+        console.log(`✅ Password changed for user ${userId}`);
+        res.json({ success: true, message: 'Password changed successfully' });
+    } catch (error) {
+        console.error('Change password error:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });

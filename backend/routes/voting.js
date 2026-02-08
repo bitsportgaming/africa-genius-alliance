@@ -172,14 +172,34 @@ router.post('/proposal', async (req, res) => {
         const updateField = voteType === 'for' ? 'votesFor' :
                            voteType === 'against' ? 'votesAgainst' : 'votesAbstain';
 
-        await Proposal.findOneAndUpdate(
+        console.log(`🗳️ Updating proposal ${proposalId} field ${updateField}`);
+
+        const updatedProposal = await Proposal.findOneAndUpdate(
             { proposalId },
-            { $inc: { [updateField]: 1 } }
+            { $inc: { [updateField]: 1 } },
+            { new: true } // Return the updated document
         );
 
-        console.log(`✅ Vote recorded: ${voterId} voted ${voteType} on proposal ${proposalId}`);
+        if (!updatedProposal) {
+            console.log(`⚠️ Proposal not found with proposalId: ${proposalId}`);
+            // Try finding by _id as fallback
+            const proposalById = await Proposal.findByIdAndUpdate(
+                proposalId,
+                { $inc: { [updateField]: 1 } },
+                { new: true }
+            );
+            if (proposalById) {
+                console.log(`✅ Vote recorded (by _id): ${voterId} voted ${voteType} on proposal ${proposalId}`);
+                console.log(`📊 Updated counts - For: ${proposalById.votesFor}, Against: ${proposalById.votesAgainst}, Abstain: ${proposalById.votesAbstain}`);
+                return res.json({ success: true, data: vote, proposal: proposalById });
+            }
+            console.log(`❌ Proposal not found by proposalId or _id: ${proposalId}`);
+        } else {
+            console.log(`✅ Vote recorded: ${voterId} voted ${voteType} on proposal ${proposalId}`);
+            console.log(`📊 Updated counts - For: ${updatedProposal.votesFor}, Against: ${updatedProposal.votesAgainst}, Abstain: ${updatedProposal.votesAbstain}`);
+        }
 
-        res.json({ success: true, data: vote });
+        res.json({ success: true, data: vote, proposal: updatedProposal });
     } catch (error) {
         console.error('Vote on proposal error:', error);
         res.status(500).json({ success: false, error: error.message });

@@ -11,11 +11,19 @@ struct ProposalDetailView: View {
     @Environment(AuthService.self) private var authService
     @Environment(\.dismiss) private var dismiss
 
-    let proposal: ProposalRecord
+    let initialProposal: ProposalRecord
+    @State private var proposal: ProposalRecord
 
     @State private var hasVoted = false
     @State private var userVote: String? = nil
     @State private var isVoting = false
+    @State private var voteError: String? = nil
+    @State private var showVoteSuccess = false
+
+    init(proposal: ProposalRecord) {
+        self.initialProposal = proposal
+        self._proposal = State(initialValue: proposal)
+    }
 
     var body: some View {
         NavigationStack {
@@ -33,9 +41,12 @@ struct ProposalDetailView: View {
                         // Voting Results
                         votingResults
 
-                        // Vote Buttons
+                        // Vote Buttons - show if user hasn't voted and proposal is active
                         if !hasVoted && proposal.status.lowercased() == "active" {
                             voteButtons
+                        } else if hasVoted {
+                            // Show voted confirmation
+                            votedConfirmation
                         }
 
                         // Implementation Details
@@ -65,6 +76,38 @@ struct ProposalDetailView: View {
                     }
                 }
             }
+            .task {
+                await checkExistingVote()
+            }
+            .alert("Vote Cast Successfully!", isPresented: $showVoteSuccess) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text("Your vote has been recorded. Thank you for participating in governance!")
+            }
+            .alert("Vote Error", isPresented: .init(
+                get: { voteError != nil },
+                set: { if !$0 { voteError = nil } }
+            )) {
+                Button("OK", role: .cancel) { voteError = nil }
+            } message: {
+                Text(voteError ?? "An error occurred while casting your vote.")
+            }
+        }
+    }
+
+    // MARK: - Check Existing Vote
+    private func checkExistingVote() async {
+        guard let userId = authService.currentUser?.id else {
+            print("⚠️ [ProposalDetailView] No user ID available")
+            return
+        }
+
+        // Check UserDefaults for local persistence
+        let voteKey = "proposal_vote_\(proposal.proposalId)_\(userId)"
+        if let savedVote = UserDefaults.standard.string(forKey: voteKey) {
+            hasVoted = true
+            userVote = savedVote
+            print("✅ [ProposalDetailView] Found existing vote in UserDefaults: \(savedVote)")
         }
     }
 
@@ -193,7 +236,9 @@ struct ProposalDetailView: View {
 
             HStack(spacing: 12) {
                 // For Button
-                Button(action: { Task { await castVote("for") } }) {
+                Button {
+                    Task { await castVote("for") }
+                } label: {
                     HStack {
                         if isVoting && userVote == "for" {
                             ProgressView().scaleEffect(0.8).tint(.white)
@@ -207,11 +252,15 @@ struct ProposalDetailView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
                     .background(RoundedRectangle(cornerRadius: 12).fill(Color.green))
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
                 .disabled(isVoting)
 
                 // Against Button
-                Button(action: { Task { await castVote("against") } }) {
+                Button {
+                    Task { await castVote("against") }
+                } label: {
                     HStack {
                         if isVoting && userVote == "against" {
                             ProgressView().scaleEffect(0.8).tint(.white)
@@ -225,12 +274,16 @@ struct ProposalDetailView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
                     .background(RoundedRectangle(cornerRadius: 12).fill(Color.red))
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
                 .disabled(isVoting)
             }
 
             // Abstain Button
-            Button(action: { Task { await castVote("abstain") } }) {
+            Button {
+                Task { await castVote("abstain") }
+            } label: {
                 HStack {
                     if isVoting && userVote == "abstain" {
                         ProgressView().scaleEffect(0.8).tint(.white)
@@ -244,10 +297,34 @@ struct ProposalDetailView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
                 .background(RoundedRectangle(cornerRadius: 12).fill(Color.gray))
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
             .disabled(isVoting)
         }
         .padding(16)
+        .background(RoundedRectangle(cornerRadius: 16).fill(Color.white.opacity(0.08)))
+    }
+
+    // MARK: - Voted Confirmation
+    private var votedConfirmation: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 48))
+                .foregroundColor(.green)
+
+            Text("You have voted")
+                .font(.system(size: 18, weight: .bold))
+                .foregroundColor(.white)
+
+            if let vote = userVote {
+                Text("Your vote: \(vote.capitalized)")
+                    .font(.system(size: 15))
+                    .foregroundColor(.white.opacity(0.7))
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(24)
         .background(RoundedRectangle(cornerRadius: 16).fill(Color.white.opacity(0.08)))
     }
 
@@ -317,10 +394,20 @@ struct ProposalDetailView: View {
 
     // MARK: - Cast Vote
     private func castVote(_ vote: String) async {
-        guard let userId = authService.currentUser?.id else { return }
+        guard let userId = authService.currentUser?.id else {
+            print("⚠️ [ProposalDetailView] Cannot vote - no user ID")
+            await MainActor.run {
+                voteError = "You must be logged in to vote"
+            }
+            return
+        }
 
-        isVoting = true
-        userVote = vote
+        print("🗳️ [ProposalDetailView] Casting vote: \(vote) for proposal: \(proposal.proposalId)")
+
+        await MainActor.run {
+            isVoting = true
+            userVote = vote
+        }
 
         do {
             _ = try await VotingAPIService.shared.voteOnProposal(
@@ -329,16 +416,53 @@ struct ProposalDetailView: View {
                 voteType: vote
             )
 
+            // Persist vote locally
+            let voteKey = "proposal_vote_\(proposal.proposalId)_\(userId)"
+            UserDefaults.standard.set(vote, forKey: voteKey)
+
+            print("✅ [ProposalDetailView] Vote cast successfully: \(vote)")
+
+            // Refresh proposal to get updated vote counts
+            await refreshProposal()
+
             await MainActor.run {
                 hasVoted = true
+                showVoteSuccess = true
                 HapticFeedback.notification(.success)
             }
         } catch {
-            print("Vote error: \(error)")
-            HapticFeedback.notification(.error)
+            print("❌ [ProposalDetailView] Vote error: \(error)")
+            await MainActor.run {
+                userVote = nil
+                if let apiError = error as? APIError {
+                    switch apiError {
+                    case .custom(let message):
+                        voteError = message
+                    default:
+                        voteError = "Failed to cast vote. Please try again."
+                    }
+                } else {
+                    voteError = error.localizedDescription
+                }
+                HapticFeedback.notification(.error)
+            }
         }
 
-        isVoting = false
+        await MainActor.run {
+            isVoting = false
+        }
+    }
+
+    private func refreshProposal() async {
+        do {
+            let updatedProposal = try await ProposalAPIService.shared.getProposal(proposalId: proposal.proposalId)
+            await MainActor.run {
+                self.proposal = updatedProposal
+            }
+            print("🔄 [ProposalDetailView] Proposal refreshed - For: \(updatedProposal.votesFor), Against: \(updatedProposal.votesAgainst), Abstain: \(updatedProposal.votesAbstain)")
+        } catch {
+            print("⚠️ [ProposalDetailView] Failed to refresh proposal: \(error)")
+        }
     }
 }
 

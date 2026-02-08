@@ -404,6 +404,9 @@ struct InboxSheet: View {
     @State private var selectedNotification: InboxMessage?
     @State private var selectedAPINotification: APINotification?
     @State private var showPostDetail = false
+    @State private var showComposeMessage = false
+    @State private var composeIconRotation: Double = 0
+    @State private var composeIconScale: CGFloat = 1.0
 
     private let tabs = ["Messages", "Notifications"]
 
@@ -449,17 +452,63 @@ struct InboxSheet: View {
                                 .foregroundColor(Color(hex: "3b82f6"))
                         }
                     }
-                    Button(action: {}) {
+                    // Animated Compose Button
+                    Button(action: {
+                        HapticFeedback.impact(.medium)
+                        // Animate the icon
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
+                            composeIconScale = 0.8
+                            composeIconRotation = -15
+                        }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
+                                composeIconScale = 1.1
+                                composeIconRotation = 10
+                            }
+                        }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                                composeIconScale = 1.0
+                                composeIconRotation = 0
+                            }
+                            showComposeMessage = true
+                        }
+                    }) {
                         Image(systemName: "square.and.pencil")
+                            .font(.system(size: 18, weight: .medium))
                             .foregroundColor(Color(hex: "10b981"))
+                            .scaleEffect(composeIconScale)
+                            .rotationEffect(.degrees(composeIconRotation))
                     }
                 }
             }
             .navigationDestination(item: $selectedConversation) { conversation in
                 ChatView(conversation: conversation, currentUserId: currentUserId)
             }
+            .sheet(isPresented: $showComposeMessage) {
+                ComposeMessageView { newConversation in
+                    // Add the new conversation to the list and select it
+                    if !conversations.contains(where: { $0.id == newConversation.id }) {
+                        conversations.insert(newConversation, at: 0)
+                    }
+                    showComposeMessage = false
+                    selectedConversation = newConversation
+                }
+                .environment(authService)
+            }
         }
         .task { await loadData() }
+        .onAppear {
+            // Subtle pulse animation on appear to draw attention
+            withAnimation(.easeInOut(duration: 0.6).repeatCount(2, autoreverses: true)) {
+                composeIconScale = 1.15
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                    composeIconScale = 1.0
+                }
+            }
+        }
     }
 
     private var tabSelector: some View {

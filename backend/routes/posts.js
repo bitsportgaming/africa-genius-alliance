@@ -70,15 +70,27 @@ router.get('/', async (req, res) => {
             } else if (feedType === 'following') {
                 // Show posts from users they follow
                 const User = require('../models/User');
-                const user = await User.findOne({ userId });
-                console.log('📝 User found for following filter:', user ? { userId: user.userId, following: user.following } : 'NOT FOUND');
+                const mongoose = require('mongoose');
+
+                // Try to find user by userId first, then by _id
+                let user = await User.findOne({ userId: userId });
+                if (!user && mongoose.Types.ObjectId.isValid(userId)) {
+                    user = await User.findById(userId);
+                }
+
+                console.log('📝 User found for following filter:', user ? {
+                    userId: user.userId,
+                    _id: user._id.toString(),
+                    following: user.following,
+                    followingCount: user.following?.length || 0
+                } : 'NOT FOUND');
 
                 if (user && user.following && user.following.length > 0) {
                     query.authorId = { $in: user.following };
                     console.log('📝 Filtering posts by authorIds:', user.following);
                 } else {
                     // If not following anyone, return empty array
-                    console.log('📝 User not following anyone, returning empty array');
+                    console.log('📝 User not following anyone or user not found, returning empty array');
                     return res.json({
                         success: true,
                         data: [],

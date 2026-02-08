@@ -31,13 +31,23 @@ router.get('/host/:hostId', async (req, res) => {
 // GET /api/live/host/:hostId/scheduled - Get scheduled live streams for a host
 router.get('/host/:hostId/scheduled', async (req, res) => {
     try {
+        const hostId = req.params.hostId;
+        console.log('📺 Fetching scheduled streams for hostId:', hostId);
+
         const streams = await LiveStream.find({
-            hostId: req.params.hostId,
+            hostId: hostId,
             status: 'scheduled',
             scheduledStartTime: { $gte: new Date() } // Only future scheduled streams
         }).sort({ scheduledStartTime: 1 });
+
+        console.log('📺 Found', streams.length, 'scheduled streams for host:', hostId);
+        if (streams.length > 0) {
+            console.log('📺 Stream titles:', streams.map(s => s.title));
+        }
+
         res.json({ success: true, data: streams });
     } catch (error) {
+        console.error('📺 Error fetching scheduled streams:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });

@@ -16,7 +16,6 @@ const voteSchema = new mongoose.Schema({
     },
     category: {
         type: String,
-        enum: ['technology', 'education', 'health', 'trade', 'environment', 'governance', 'arts', 'agriculture'],
         default: null
     },
     voteWeight: {
@@ -25,8 +24,8 @@ const voteSchema = new mongoose.Schema({
     },
     outcome: {
         type: String,
-        enum: ['pending', 'counted', 'expired'],
-        default: 'counted'
+        enum: ['pending', 'counted', 'expired', 'voted', 'for', 'against', 'abstain', 'supported'],
+        default: 'voted'
     }
 }, {
     timestamps: true

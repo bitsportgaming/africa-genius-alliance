@@ -21,6 +21,7 @@ const proposalsRouter = require('./routes/proposals');
 const productsRouter = require('./routes/products');
 const adminRouter = require('./routes/admin');
 const uploadRouter = require('./routes/upload');
+const notificationsRouter = require('./routes/notifications');
 
 const app = express();
 const server = http.createServer(app);
@@ -44,8 +45,8 @@ if (!fs.existsSync(uploadsDir)) {
 
 // Middleware
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Serve uploaded files statically
 app.use('/uploads', express.static(uploadsDir));
@@ -65,6 +66,7 @@ app.use('/api/proposals', proposalsRouter);
 app.use('/api/products', productsRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/upload', uploadRouter);
+app.use('/api/notifications', notificationsRouter);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

@@ -4,6 +4,8 @@ const multer = require('multer');
 const path = require('path');
 const crypto = require('crypto');
 const Post = require('../models/Post');
+const User = require('../models/User');
+const Notification = require('../models/Notification');
 
 // Helper function to generate unique ID
 function generateUniqueId() {
@@ -168,6 +170,30 @@ router.post('/', upload.array('media', 5), async (req, res) => {
         });
 
         await post.save();
+
+        // Create notifications for followers
+        try {
+            const followers = await User.find({ following: authorId });
+            if (followers.length > 0) {
+                const notificationPromises = followers.map(follower => {
+                    return new Notification({
+                        userId: follower.userId,
+                        type: 'post',
+                        title: `${authorName || 'A genius'} posted`,
+                        message: content.substring(0, 100) + (content.length > 100 ? '...' : ''),
+                        relatedPostId: post._id,
+                        relatedUserId: authorId,
+                        relatedUserName: authorName || 'Anonymous'
+                    }).save();
+                });
+                await Promise.all(notificationPromises);
+                console.log(`📬 Created ${followers.length} notifications for post ${post._id}`);
+            }
+        } catch (notifError) {
+            console.error('Error creating notifications:', notifError);
+            // Don't fail the post creation if notifications fail
+        }
+
         res.status(201).json({ success: true, data: post });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });

@@ -17,8 +17,14 @@ class AuthService {
         return currentUser != nil
     }
 
+    /// Flag to suppress SplashScreenView from auto-switching to onboarding
+    /// when role is changed from within the app (e.g., RoleSelectionSheet)
+    var suppressOnboardingRedirect: Bool = false
+
     // Track if genius has completed onboarding
     var needsGeniusOnboarding: Bool {
+        // If redirect is suppressed (in-app role switch), don't trigger onboarding redirect
+        if suppressOnboardingRedirect { return false }
         guard let user = currentUser, user.role == .genius else { return false }
         return !hasCompletedGeniusOnboarding
     }
@@ -49,8 +55,12 @@ class AuthService {
             role: role
         )
 
+        print("🔍 [AuthService] Registration response - userId: '\(apiUser.userId)', role: '\(apiUser.role)', votesReceived: \(apiUser.votesReceived ?? 0), followersCount: \(apiUser.followersCount ?? 0)")
+
         // Convert API response to local User model
         let user = convertAPIUserToUser(apiUser)
+
+        print("🔍 [AuthService] Converted user - id: '\(user.id)', role: '\(user.role.rawValue)', votesReceived: \(user.votesReceived), followersCount: \(user.followersCount)")
 
         // Save to persistence
         self.currentUser = user
@@ -80,10 +90,22 @@ class AuthService {
     }
 
     func updateUserRole(to role: UserRole) {
-        currentUser?.role = role
-        if let user = currentUser {
-            saveUser(user)
-        }
+        guard let user = currentUser else { return }
+        user.role = role
+        // Reassign to trigger @Observable update
+        currentUser = user
+        saveUser(user)
+    }
+
+    /// Update the user's profile image URL and persist to UserDefaults
+    /// This method properly triggers @Observable update by reassigning currentUser
+    func updateProfileImageURL(_ imageURL: String) {
+        guard let user = currentUser else { return }
+        user.profileImageURL = imageURL
+        // Reassign to trigger @Observable update
+        currentUser = user
+        saveUser(user)
+        print("💾 [AuthService] Profile image URL updated and saved: \(imageURL)")
     }
 
     // MARK: - Profile Methods
@@ -91,8 +113,19 @@ class AuthService {
     func refreshProfile() async throws {
         guard let userId = currentUser?.id else { return }
 
+        // Preserve current profileImageURL in case backend doesn't return it
+        let existingProfileImageURL = currentUser?.profileImageURL
+
         let apiUser = try await UserAPIService.shared.getProfile(userId: userId)
         let user = convertAPIUserToUser(apiUser)
+
+        // Preserve profileImageURL if backend didn't return one (fallback)
+        if user.profileImageURL == nil || user.profileImageURL?.isEmpty == true {
+            if existingProfileImageURL != nil {
+                user.profileImageURL = existingProfileImageURL
+                print("⚠️ [AuthService] refreshProfile: Backend didn't return profileImageURL, preserved existing: '\(existingProfileImageURL ?? "nil")'")
+            }
+        }
 
         self.currentUser = user
         saveUser(user)
@@ -100,6 +133,9 @@ class AuthService {
 
     func updateProfile(displayName: String?, bio: String?, country: String?) async throws {
         guard let userId = currentUser?.id else { return }
+
+        // Preserve current profileImageURL in case backend doesn't return it
+        let existingProfileImageURL = currentUser?.profileImageURL
 
         let apiUser = try await UserAPIService.shared.updateProfile(
             userId: userId,
@@ -109,6 +145,39 @@ class AuthService {
         )
 
         let user = convertAPIUserToUser(apiUser)
+
+        // Preserve profileImageURL if backend didn't return one
+        if user.profileImageURL == nil || user.profileImageURL?.isEmpty == true {
+            user.profileImageURL = existingProfileImageURL
+            print("🔍 [AuthService] updateProfile: Preserved existing profileImageURL: '\(existingProfileImageURL ?? "nil")'")
+        }
+
+        self.currentUser = user
+        saveUser(user)
+    }
+
+    func updateSocialLinks(twitter: String?, instagram: String?, linkedin: String?, website: String?) async throws {
+        guard let userId = currentUser?.id else { return }
+
+        // Preserve current profileImageURL in case backend doesn't return it
+        let existingProfileImageURL = currentUser?.profileImageURL
+
+        let apiUser = try await UserAPIService.shared.updateSocialLinks(
+            userId: userId,
+            twitter: twitter,
+            instagram: instagram,
+            linkedin: linkedin,
+            website: website
+        )
+
+        let user = convertAPIUserToUser(apiUser)
+
+        // Preserve profileImageURL if backend didn't return one
+        if user.profileImageURL == nil || user.profileImageURL?.isEmpty == true {
+            user.profileImageURL = existingProfileImageURL
+            print("🔍 [AuthService] updateSocialLinks: Preserved existing profileImageURL: '\(existingProfileImageURL ?? "nil")'")
+        }
+
         self.currentUser = user
         saveUser(user)
     }
@@ -118,13 +187,16 @@ class AuthService {
     func saveUser(_ user: User) {
         UserDefaults.standard.set(user.id, forKey: userIdKey)
 
+        let profileImageValue = user.profileImageURL ?? ""
+        print("💾 [AuthService] saveUser - profileImageURL: '\(profileImageValue)'")
+
         let userData: [String: Any] = [
             "id": user.id,
             "username": user.username,
             "displayName": user.displayName,
             "email": user.email,
             "bio": user.bio ?? "",
-            "profileImageURL": user.profileImageURL ?? "",
+            "profileImageURL": profileImageValue,
             "role": user.role.rawValue,
             "country": user.country ?? "",
             "followersCount": user.followersCount,
@@ -132,16 +204,26 @@ class AuthService {
             "votesReceived": user.votesReceived
         ]
         UserDefaults.standard.set(userData, forKey: userDataKey)
+
+        // Force synchronize to ensure data is written immediately
+        UserDefaults.standard.synchronize()
     }
 
     private func restoreUser() {
         guard let userData = UserDefaults.standard.dictionary(forKey: userDataKey),
               let id = userData["id"] as? String else {
+            print("🔍 [AuthService] restoreUser: No saved user data found")
             return
         }
 
         let roleString = userData["role"] as? String ?? "regular"
         let role = parseRole(from: roleString)
+
+        // Get profileImageURL and handle empty string as nil
+        let rawProfileImageURL = userData["profileImageURL"] as? String
+        let profileImageURL: String? = (rawProfileImageURL?.isEmpty == false) ? rawProfileImageURL : nil
+
+        print("🔍 [AuthService] restoreUser: Restoring user - id: '\(id)', role: '\(roleString)', profileImageURL: '\(profileImageURL ?? "nil")', followersCount: \(userData["followersCount"] ?? 0), votesReceived: \(userData["votesReceived"] ?? 0)")
 
         let user = User(
             id: id,
@@ -149,7 +231,7 @@ class AuthService {
             displayName: userData["displayName"] as? String ?? "",
             email: userData["email"] as? String ?? "",
             bio: userData["bio"] as? String,
-            profileImageURL: userData["profileImageURL"] as? String,
+            profileImageURL: profileImageURL,
             role: role,
             followersCount: userData["followersCount"] as? Int ?? 0,
             followingCount: userData["followingCount"] as? Int ?? 0,
@@ -222,6 +304,9 @@ class AuthService {
             throw APIError.custom("User not authenticated")
         }
 
+        // Preserve current profileImageURL in case backend doesn't return it
+        let existingProfileImageURL = currentUser?.profileImageURL
+
         // Update profile with onboarding data
         let apiUser = try await UserAPIService.shared.updateGeniusProfile(
             userId: userId,
@@ -239,6 +324,13 @@ class AuthService {
 
         // Update local user
         let user = convertAPIUserToUser(apiUser)
+
+        // Preserve profileImageURL if backend didn't return one
+        if user.profileImageURL == nil || user.profileImageURL?.isEmpty == true {
+            user.profileImageURL = existingProfileImageURL
+            print("🔍 [AuthService] completeGeniusOnboarding: Preserved existing profileImageURL: '\(existingProfileImageURL ?? "nil")'")
+        }
+
         self.currentUser = user
         saveUser(user)
 

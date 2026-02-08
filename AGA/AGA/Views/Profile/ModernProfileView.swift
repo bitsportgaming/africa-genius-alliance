@@ -696,8 +696,16 @@ struct RoleSelectionSheet: View {
     @Environment(AuthService.self) private var authService
     @Environment(\.dismiss) private var dismiss
 
+    @State private var showGeniusOnboarding = false
+
     private var currentRole: UserRole {
         authService.currentUser?.role ?? .regular
+    }
+
+    /// Check if user needs genius onboarding (hasn't completed it yet)
+    private var needsGeniusOnboarding: Bool {
+        guard let userId = authService.currentUser?.id else { return true }
+        return !UserDefaults.standard.bool(forKey: "aga_genius_onboarding_\(userId)")
     }
 
     var body: some View {
@@ -731,7 +739,7 @@ struct RoleSelectionSheet: View {
                         description: "Create posts, go live, and build your following",
                         selectedColor: Color(hex: "10b981"),
                         action: {
-                            selectRole(.genius)
+                            selectGeniusRole()
                         }
                     )
 
@@ -772,6 +780,41 @@ struct RoleSelectionSheet: View {
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(Color(hex: "10b981"))
                 }
+            }
+            .fullScreenCover(isPresented: $showGeniusOnboarding) {
+                GeniusOnboardingView()
+                    .environment(authService)
+            }
+        }
+    }
+
+    private func selectGeniusRole() {
+        HapticFeedback.impact(.medium)
+
+        // Suppress SplashScreenView from auto-redirecting to onboarding
+        // We handle onboarding here via fullScreenCover
+        authService.suppressOnboardingRedirect = true
+
+        // Update user role - User is a class so properties can be mutated with let
+        guard let user = authService.currentUser else { return }
+        user.role = .genius
+
+        // Reassign to trigger @Observable update
+        authService.currentUser = user
+        authService.saveUser(user)
+
+        // Check if user needs to complete genius onboarding
+        if needsGeniusOnboarding {
+            // Show genius onboarding flow as a fullScreenCover
+            // This prevents the parent SplashScreenView from handling it
+            HapticFeedback.notification(.warning)
+            showGeniusOnboarding = true
+        } else {
+            // Already completed onboarding, just switch role
+            authService.suppressOnboardingRedirect = false
+            HapticFeedback.notification(.success)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                dismiss()
             }
         }
     }

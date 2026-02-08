@@ -10,15 +10,16 @@ import SwiftUI
 struct GeniusOnboardingView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(AuthService.self) private var authService
-    
+
     @State private var currentStep = 1
     @State private var onboardingData = GeniusOnboardingData()
     @State private var isSubmitting = false
     @State private var showError = false
     @State private var errorMessage = ""
-    
+    @State private var showExitConfirmation = false
+
     private let totalSteps = 5
-    
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -29,11 +30,11 @@ struct GeniusOnboardingView: View {
                     endPoint: .bottomTrailing
                 )
                 .ignoresSafeArea()
-                
+
                 VStack(spacing: 0) {
                     // Progress Header
                     progressHeader
-                    
+
                     // Step Content
                     TabView(selection: $currentStep) {
                         CategorySelectionStep(
@@ -41,7 +42,7 @@ struct GeniusOnboardingView: View {
                             onNext: { nextStep() }
                         )
                         .tag(1)
-                        
+
                         PositionSelectionStep(
                             category: onboardingData.category,
                             positionType: $onboardingData.positionType,
@@ -53,7 +54,7 @@ struct GeniusOnboardingView: View {
                             onBack: { previousStep() }
                         )
                         .tag(2)
-                        
+
                         ProfileDetailsStep(
                             fullName: $onboardingData.fullName,
                             country: $onboardingData.country,
@@ -62,7 +63,7 @@ struct GeniusOnboardingView: View {
                             onBack: { previousStep() }
                         )
                         .tag(3)
-                        
+
                         PitchProblemStep(
                             whyGenius: $onboardingData.whyGenius,
                             problemSolved: $onboardingData.problemSolved,
@@ -70,7 +71,7 @@ struct GeniusOnboardingView: View {
                             onBack: { previousStep() }
                         )
                         .tag(4)
-                        
+
                         ProofOfWorkStep(
                             proofLinks: $onboardingData.proofLinks,
                             credentials: $onboardingData.credentials,
@@ -91,23 +92,51 @@ struct GeniusOnboardingView: View {
             } message: {
                 Text(errorMessage)
             }
+            .alert("Exit Genius Setup?", isPresented: $showExitConfirmation) {
+                Button("Continue Setup", role: .cancel) { }
+                Button("Exit", role: .destructive) {
+                    exitOnboarding()
+                }
+            } message: {
+                Text("Your progress will not be saved. You can start the Genius setup again anytime from your profile.")
+            }
         }
     }
     
     // MARK: - Progress Header
     private var progressHeader: some View {
         VStack(spacing: 16) {
-            // Step indicators
-            HStack(spacing: 8) {
-                ForEach(1...totalSteps, id: \.self) { step in
-                    Capsule()
-                        .fill(step <= currentStep ? Color(hex: "f59e0b") : Color.white.opacity(0.3))
-                        .frame(height: 4)
+            // Close button and step indicators
+            HStack {
+                // Close button
+                Button(action: {
+                    HapticFeedback.impact(.light)
+                    showExitConfirmation = true
+                }) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.8))
+                        .frame(width: 32, height: 32)
+                        .background(Color.white.opacity(0.15))
+                        .clipShape(Circle())
                 }
+
+                // Step indicators
+                HStack(spacing: 8) {
+                    ForEach(1...totalSteps, id: \.self) { step in
+                        Capsule()
+                            .fill(step <= currentStep ? Color(hex: "f59e0b") : Color.white.opacity(0.3))
+                            .frame(height: 4)
+                    }
+                }
+
+                // Spacer to balance the close button
+                Color.clear
+                    .frame(width: 32, height: 32)
             }
             .padding(.horizontal, 24)
             .padding(.top, 16)
-            
+
             // Step title
             Text(stepTitle)
                 .font(.system(size: 14, weight: .medium))
@@ -142,12 +171,14 @@ struct GeniusOnboardingView: View {
     
     private func submitOnboarding() {
         isSubmitting = true
-        
+
         Task {
             do {
                 try await authService.completeGeniusOnboarding(data: onboardingData)
                 await MainActor.run {
                     isSubmitting = false
+                    // Reset the suppress flag since onboarding is complete
+                    authService.suppressOnboardingRedirect = false
                     dismiss()
                 }
             } catch {
@@ -158,6 +189,15 @@ struct GeniusOnboardingView: View {
                 }
             }
         }
+    }
+
+    private func exitOnboarding() {
+        // Reset the suppress flag since user is exiting
+        authService.suppressOnboardingRedirect = false
+        // Revert user role to supporter/regular
+        authService.updateUserRole(to: .regular)
+        HapticFeedback.notification(.warning)
+        dismiss()
     }
 }
 

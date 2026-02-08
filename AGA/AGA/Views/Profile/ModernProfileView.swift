@@ -12,6 +12,7 @@ import PhotosUI
 struct ModernProfileView: View {
     @Environment(AuthService.self) private var authService
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
     @Query(sort: \Post.createdAt, order: .reverse) private var allPosts: [Post]
 
     @State private var showSettings = false
@@ -20,6 +21,26 @@ struct ModernProfileView: View {
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var profileImage: UIImage?
     @State private var isUploadingPhoto = false
+    @State private var showEditProfile = false
+    @State private var showWaitlistConfirmation = false
+    @State private var showWaitlistSuccess = false
+    @State private var isJoiningWaitlist = false
+    @State private var waitlistError: String?
+    @State private var isRefreshing = false
+
+    private var isOnWaitlist: Bool {
+        guard let userId = authService.currentUser?.id else { return false }
+        return UserDefaults.standard.bool(forKey: "aga_genius_waitlist_\(userId)")
+    }
+
+    // Use UpvoteManager for consistent vote counts across the app
+    private let upvoteManager = UpvoteManager.shared
+
+    /// Get the current vote count - uses UpvoteManager's cached count if available
+    private var currentVoteCount: Int {
+        guard let userId = authService.currentUser?.id else { return 0 }
+        return upvoteManager.getVoteCount(userId) ?? authService.currentUser?.votesReceived ?? 0
+    }
 
     private var userPosts: [Post] {
         allPosts.filter { $0.author?.id == authService.currentUser?.id }
@@ -44,11 +65,9 @@ struct ModernProfileView: View {
                     VStack(spacing: 24) {
                         // Header
                         HStack {
-                            Button(action: {}) {
-                                Image(systemName: "chevron.left")
-                                    .font(.system(size: 20, weight: .semibold))
-                                    .foregroundColor(.white)
-                            }
+                            // Empty spacer to balance the settings button
+                            Color.clear
+                                .frame(width: 20, height: 20)
 
                             Spacer()
 
@@ -58,11 +77,15 @@ struct ModernProfileView: View {
 
                             Spacer()
 
-                            Button(action: { showSettings = true }) {
+                            Button(action: {
+                                HapticFeedback.impact(.light)
+                                showSettings = true
+                            }) {
                                 Image(systemName: "gearshape")
                                     .font(.system(size: 20))
                                     .foregroundColor(.white)
                             }
+                            .buttonStyle(.plain)
                         }
                         .padding(.horizontal, 20)
                         .padding(.top, 10)
@@ -89,24 +112,13 @@ struct ModernProfileView: View {
                                                     .stroke(Color.white, lineWidth: 4)
                                             )
                                     } else if let imageURL = authService.currentUser?.profileImageURL, !imageURL.isEmpty {
-                                        AsyncImage(url: URL(string: imageURL)) { image in
-                                            image
-                                                .resizable()
-                                                .scaledToFill()
-                                        } placeholder: {
-                                            Circle()
-                                                .fill(Color.white.opacity(0.3))
-                                                .overlay(
-                                                    ProgressView()
-                                                        .tint(.white)
-                                                )
-                                        }
-                                        .frame(width: 120, height: 120)
-                                        .clipShape(Circle())
-                                        .overlay(
-                                            Circle()
-                                                .stroke(Color.white, lineWidth: 4)
-                                        )
+                                        RemoteImage(urlString: imageURL)
+                                            .frame(width: 120, height: 120)
+                                            .clipShape(Circle())
+                                            .overlay(
+                                                Circle()
+                                                    .stroke(Color.white, lineWidth: 4)
+                                            )
                                     } else {
                                         Circle()
                                             .fill(
@@ -198,27 +210,86 @@ struct ModernProfileView: View {
                         HStack(spacing: 40) {
                             ProfileStatItem(value: "\(authService.currentUser?.followersCount ?? 0)", label: "Followers")
                             ProfileStatItem(value: "\(userPosts.count)", label: "Posts")
-                            ProfileStatItem(value: formatLikes(authService.currentUser?.votesReceived ?? 0), label: "Likes")
+                            ProfileStatItem(value: formatLikes(currentVoteCount), label: "Likes")
                         }
                         .padding(.vertical, 20)
 
                         // Action Buttons (matching reference)
                         VStack(spacing: 12) {
-                            // Join Waitlist button
-                            Button(action: {}) {
-                                Text("Join Waitlist")
-                                    .font(.system(size: 16, weight: .semibold))
-                                    .foregroundColor(Color(hex: "f59e0b"))
+                            // Edit Profile button
+                            Button(action: {
+                                HapticFeedback.impact(.light)
+                                showEditProfile = true
+                            }) {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "pencil")
+                                        .font(.system(size: 14, weight: .semibold))
+                                    Text("Edit Profile")
+                                        .font(.system(size: 16, weight: .semibold))
+                                }
+                                .foregroundColor(Color(hex: "0a4d3c"))
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 25)
+                                        .fill(Color.white)
+                                )
+                            }
+                            .buttonStyle(.plain)
+
+                            // Join Waitlist button (for becoming a verified Genius)
+                            if !isGenius {
+                                if isOnWaitlist {
+                                    // Already on waitlist - show status
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .font(.system(size: 14))
+                                        Text("On Genius Waitlist")
+                                            .font(.system(size: 16, weight: .semibold))
+                                    }
+                                    .foregroundColor(.white.opacity(0.8))
                                     .frame(maxWidth: .infinity)
                                     .padding(.vertical, 14)
                                     .background(
                                         RoundedRectangle(cornerRadius: 25)
-                                            .fill(Color.white)
+                                            .stroke(Color.white.opacity(0.5), lineWidth: 2)
                                     )
+                                } else {
+                                    // Can join waitlist
+                                    Button(action: {
+                                        HapticFeedback.impact(.light)
+                                        showWaitlistConfirmation = true
+                                    }) {
+                                        HStack(spacing: 8) {
+                                            if isJoiningWaitlist {
+                                                ProgressView()
+                                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                                    .scaleEffect(0.8)
+                                            } else {
+                                                Image(systemName: "star.fill")
+                                                    .font(.system(size: 14))
+                                            }
+                                            Text("Join Genius Waitlist")
+                                                .font(.system(size: 16, weight: .semibold))
+                                        }
+                                        .foregroundColor(.white)
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 14)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 25)
+                                                .fill(Color(hex: "0a4d3c"))
+                                        )
+                                    }
+                                    .buttonStyle(.plain)
+                                    .disabled(isJoiningWaitlist)
+                                }
                             }
 
                             // Switch Role button
-                            Button(action: { showRoleChange = true }) {
+                            Button(action: {
+                                HapticFeedback.impact(.light)
+                                showRoleChange = true
+                            }) {
                                 Text("Switch Role")
                                     .font(.system(size: 16, weight: .semibold))
                                     .foregroundColor(.white)
@@ -229,6 +300,7 @@ struct ModernProfileView: View {
                                             .stroke(Color.white, lineWidth: 2)
                                     )
                             }
+                            .buttonStyle(.plain)
                         }
                         .padding(.horizontal, 40)
 
@@ -248,9 +320,13 @@ struct ModernProfileView: View {
 
                         // Settings section (card style)
                         VStack(spacing: 0) {
-                            Button(action: { authService.signOut() }) {
+                            Button(action: {
+                                HapticFeedback.impact(.medium)
+                                authService.signOut()
+                            }) {
                                 SettingsRow(icon: "rectangle.portrait.and.arrow.right", title: "Sign Out", isDestructive: true)
                             }
+                            .buttonStyle(.plain)
                         }
                         .background(Color.white.opacity(0.15))
                         .cornerRadius(16)
@@ -258,24 +334,81 @@ struct ModernProfileView: View {
 
                         Spacer()
                             .frame(height: 40)
-                        
+
                         Spacer()
                             .frame(height: 40)
                     }
                 }
             }
             .navigationBarHidden(true)
-            .alert("Change Role", isPresented: $showRoleChange) {
-                Button("Genius") {
-                    authService.currentUser?.role = .genius
+            .sheet(isPresented: $showSettings) {
+                if let userId = authService.currentUser?.id {
+                    GeniusSettingsSheet(userId: userId)
+                        .environment(authService)
                 }
-                Button("Regular User") {
-                    authService.currentUser?.role = .regular
+            }
+            .sheet(isPresented: $showEditProfile) {
+                NavigationStack {
+                    EditProfileSection()
+                        .environment(authService)
+                        .toolbar {
+                            ToolbarItem(placement: .navigationBarLeading) {
+                                Button("Cancel") {
+                                    showEditProfile = false
+                                }
+                            }
+                        }
+                }
+            }
+            .alert("Join Genius Waitlist", isPresented: $showWaitlistConfirmation) {
+                Button("Join Waitlist") {
+                    joinWaitlist()
                 }
                 Button("Cancel", role: .cancel) {}
             } message: {
-                Text("Select your new role")
+                Text("Join the waitlist to become a verified Genius. You'll be notified when your application is reviewed.")
             }
+            .alert("You're on the Waitlist! 🎉", isPresented: $showWaitlistSuccess) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("Thanks for joining! We'll notify you via email when your Genius application is ready for review.")
+            }
+            .alert("Waitlist Error", isPresented: .init(
+                get: { waitlistError != nil },
+                set: { if !$0 { waitlistError = nil } }
+            )) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(waitlistError ?? "Failed to join waitlist. Please try again.")
+            }
+            .sheet(isPresented: $showRoleChange) {
+                RoleSelectionSheet()
+                    .environment(authService)
+            }
+            .onAppear {
+                // Refresh profile stats from backend every time view appears
+                Task {
+                    await refreshProfileStats()
+                }
+            }
+            .refreshable {
+                // Pull-to-refresh support
+                await refreshProfileStats()
+            }
+        }
+    }
+
+    // MARK: - Refresh Profile Stats
+    private func refreshProfileStats() async {
+        guard !isRefreshing else { return }
+        isRefreshing = true
+        defer { isRefreshing = false }
+
+        do {
+            try await authService.refreshProfile()
+            print("✅ [ModernProfileView] Profile stats refreshed - Followers: \(authService.currentUser?.followersCount ?? 0), Likes: \(authService.currentUser?.votesReceived ?? 0)")
+        } catch {
+            print("⚠️ [ModernProfileView] Failed to refresh profile: \(error)")
         }
     }
 
@@ -392,13 +525,17 @@ struct ModernProfileView: View {
                 // Upload to backend
                 let imageURL = try await UserAPIService.shared.uploadProfileImage(image: uiImage, userId: userId)
 
-                // Update local user with new image URL
+                // Validate the returned URL is not empty
+                guard !imageURL.isEmpty else {
+                    print("❌ [ProfileImage] Backend returned empty profileImageURL")
+                    throw NSError(domain: "ProfileImage", code: -1, userInfo: [NSLocalizedDescriptionKey: "Server returned empty image URL"])
+                }
+
+                print("✅ [ProfileImage] Upload successful, URL: \(imageURL)")
+
+                // Update local user with new image URL (uses AuthService method that properly triggers @Observable update)
                 await MainActor.run {
-                    authService.currentUser?.profileImageURL = imageURL
-                    // Persist the updated user
-                    if let user = authService.currentUser {
-                        authService.saveUser(user)
-                    }
+                    authService.updateProfileImageURL(imageURL)
                     isUploadingPhoto = false
                     HapticFeedback.notification(.success)
                 }
@@ -408,6 +545,38 @@ struct ModernProfileView: View {
             await MainActor.run {
                 isUploadingPhoto = false
                 HapticFeedback.notification(.error)
+            }
+        }
+    }
+
+    // MARK: - Join Waitlist
+    private func joinWaitlist() {
+        guard let user = authService.currentUser else { return }
+
+        isJoiningWaitlist = true
+        waitlistError = nil
+
+        Task {
+            do {
+                try await UserAPIService.shared.joinGeniusWaitlist(
+                    userId: user.id,
+                    email: user.email,
+                    displayName: user.displayName
+                )
+
+                await MainActor.run {
+                    // Save waitlist status locally
+                    UserDefaults.standard.set(true, forKey: "aga_genius_waitlist_\(user.id)")
+                    isJoiningWaitlist = false
+                    showWaitlistSuccess = true
+                    HapticFeedback.notification(.success)
+                }
+            } catch {
+                await MainActor.run {
+                    isJoiningWaitlist = false
+                    waitlistError = error.localizedDescription
+                    HapticFeedback.notification(.error)
+                }
             }
         }
     }
@@ -519,6 +688,177 @@ struct CompactPostCard: View {
         .background(DesignSystem.Colors.adaptiveSurface)
         .cornerRadius(AppConstants.cornerRadius)
         .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 2)
+    }
+}
+
+// MARK: - Role Selection Sheet
+struct RoleSelectionSheet: View {
+    @Environment(AuthService.self) private var authService
+    @Environment(\.dismiss) private var dismiss
+
+    private var currentRole: UserRole {
+        authService.currentUser?.role ?? .regular
+    }
+
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 24) {
+                // Header
+                VStack(spacing: 8) {
+                    Image(systemName: "person.badge.key.fill")
+                        .font(.system(size: 48))
+                        .foregroundColor(Color(hex: "10b981"))
+
+                    Text("Select Your Role")
+                        .font(.system(size: 24, weight: .bold))
+                        .foregroundColor(Color(hex: "1f2937"))
+
+                    Text("Choose how you want to participate in the AGA community")
+                        .font(.system(size: 14))
+                        .foregroundColor(Color(hex: "6b7280"))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 20)
+                }
+                .padding(.top, 20)
+
+                // Role Options
+                VStack(spacing: 12) {
+                    RoleOptionCard(
+                        role: .genius,
+                        isSelected: currentRole == .genius,
+                        icon: "star.fill",
+                        title: "Genius",
+                        description: "Create posts, go live, and build your following",
+                        selectedColor: Color(hex: "10b981"),
+                        action: {
+                            selectRole(.genius)
+                        }
+                    )
+
+                    RoleOptionCard(
+                        role: .regular,
+                        isSelected: currentRole == .regular,
+                        icon: "heart.fill",
+                        title: "Supporter",
+                        description: "Vote, comment, and support your favorite geniuses",
+                        selectedColor: Color(hex: "3b82f6"),
+                        action: {
+                            selectRole(.regular)
+                        }
+                    )
+                }
+                .padding(.horizontal, 20)
+
+                Spacer()
+
+                // Current role indicator
+                HStack(spacing: 6) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 14))
+                        .foregroundColor(Color(hex: "10b981"))
+                    Text("Current role: \(currentRole.displayName)")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(Color(hex: "6b7280"))
+                }
+                .padding(.bottom, 20)
+            }
+            .background(Color(hex: "f9fafb").ignoresSafeArea())
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(Color(hex: "10b981"))
+                }
+            }
+        }
+    }
+
+    private func selectRole(_ role: UserRole) {
+        HapticFeedback.impact(.medium)
+
+        // Update user role - User is a class so properties can be mutated with let
+        guard let user = authService.currentUser else { return }
+        user.role = role
+
+        // Reassign to trigger @Observable update
+        authService.currentUser = user
+        authService.saveUser(user)
+
+        HapticFeedback.notification(.success)
+
+        // Dismiss after a short delay to show the selection
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            dismiss()
+        }
+    }
+}
+
+// MARK: - Role Option Card
+struct RoleOptionCard: View {
+    let role: UserRole
+    let isSelected: Bool
+    let icon: String
+    let title: String
+    let description: String
+    let selectedColor: Color
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 16) {
+                // Icon
+                ZStack {
+                    Circle()
+                        .fill(isSelected ? selectedColor.opacity(0.15) : Color(hex: "f3f4f6"))
+                        .frame(width: 50, height: 50)
+
+                    Image(systemName: icon)
+                        .font(.system(size: 22))
+                        .foregroundColor(isSelected ? selectedColor : Color(hex: "9ca3af"))
+                }
+
+                // Text
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundColor(isSelected ? Color(hex: "1f2937") : Color(hex: "6b7280"))
+
+                    Text(description)
+                        .font(.system(size: 13))
+                        .foregroundColor(Color(hex: "9ca3af"))
+                        .lineLimit(2)
+                }
+
+                Spacer()
+
+                // Radio button indicator
+                ZStack {
+                    Circle()
+                        .stroke(isSelected ? selectedColor : Color(hex: "d1d5db"), lineWidth: 2)
+                        .frame(width: 24, height: 24)
+
+                    if isSelected {
+                        Circle()
+                            .fill(selectedColor)
+                            .frame(width: 14, height: 14)
+                    }
+                }
+            }
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.white)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(isSelected ? selectedColor : Color(hex: "e5e7eb"), lineWidth: isSelected ? 2 : 1)
+            )
+            .shadow(color: isSelected ? selectedColor.opacity(0.15) : Color.black.opacity(0.03), radius: isSelected ? 8 : 4, x: 0, y: 2)
+        }
+        .buttonStyle(.plain)
     }
 }
 

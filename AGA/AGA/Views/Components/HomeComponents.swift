@@ -3,103 +3,170 @@
 //  AGA
 //
 //  Created by AGA Team on 12/30/25.
+//  Enhanced UI V2
 //
 
 import SwiftUI
 
-// MARK: - Top Bar
+// MARK: - Top Bar (Enhanced with glass effect)
 struct HomeTopBar: View {
     let greeting: String
     let subtitle: String?
     let avatarURL: String?
     let initials: String
+    var notificationCount: Int = 0
     var onNotificationTap: () -> Void = {}
     var onAvatarTap: () -> Void = {}
     var onSearchTap: (() -> Void)? = nil
 
     private var initialsView: some View {
         ZStack {
+            // Glow effect
+            Circle()
+                .fill(DesignSystem.Colors.primary.opacity(0.2))
+                .frame(width: 46, height: 46)
+                .blur(radius: 4)
+
             Circle()
                 .fill(DesignSystem.Gradients.primary)
-                .frame(width: 40, height: 40)
+                .frame(width: 42, height: 42)
             Text(initials)
-                .font(.system(size: 14, weight: .bold))
+                .font(.system(size: 14, weight: .bold, design: .rounded))
                 .foregroundColor(.white)
         }
     }
 
     var body: some View {
         HStack {
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(greeting)
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundColor(Color(hex: "1f2937"))
+                    .font(DesignSystem.Typography.title2)
+                    .foregroundColor(DesignSystem.Colors.textPrimary)
                 if let subtitle = subtitle {
                     Text(subtitle)
-                        .font(.system(size: 13))
-                        .foregroundColor(Color(hex: "6b7280"))
+                        .font(DesignSystem.Typography.subheadline)
+                        .foregroundColor(DesignSystem.Colors.textTertiary)
                 }
             }
 
             Spacer()
 
-            HStack(spacing: 12) {
+            HStack(spacing: 10) {
                 if let onSearch = onSearchTap {
-                    Button(action: onSearch) {
-                        Image(systemName: "magnifyingglass")
-                            .font(.system(size: 18))
-                            .foregroundColor(Color(hex: "4b5563"))
-                            .frame(width: 40, height: 40)
-                            .background(Color(hex: "f3f4f6"))
-                            .clipShape(Circle())
-                    }
+                    IconButtonSmall(icon: "magnifyingglass", action: onSearch)
                 }
 
-                Button(action: onNotificationTap) {
+                // Notification button with badge
+                Button(action: {
+                    HapticFeedback.impact(.light)
+                    onNotificationTap()
+                }) {
                     ZStack(alignment: .topTrailing) {
                         Image(systemName: "bell.fill")
-                            .font(.system(size: 18))
-                            .foregroundColor(Color(hex: "4b5563"))
-                            .frame(width: 40, height: 40)
-                            .background(Color(hex: "f3f4f6"))
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(DesignSystem.Colors.textSecondary)
+                            .frame(width: 42, height: 42)
+                            .background(DesignSystem.Colors.surfaceSecondary)
                             .clipShape(Circle())
+                            .overlay(
+                                Circle()
+                                    .stroke(DesignSystem.Colors.border, lineWidth: 1)
+                            )
 
-                        Circle()
-                            .fill(Color(hex: "ef4444"))
-                            .frame(width: 10, height: 10)
-                            .offset(x: 2, y: -2)
-                    }
-                }
+                        // Notification badge - only show when there are notifications
+                        if notificationCount > 0 {
+                            ZStack {
+                                Circle()
+                                    .fill(DesignSystem.Colors.error)
+                                    .frame(width: notificationCount > 9 ? 18 : 14, height: 14)
 
-                Button(action: onAvatarTap) {
-                    if let avatarURL = avatarURL, !avatarURL.isEmpty, let url = URL(string: avatarURL) {
-                        AsyncImage(url: url) { phase in
-                            switch phase {
-                            case .success(let image):
-                                image
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(width: 40, height: 40)
-                                    .clipShape(Circle())
-                            case .failure, .empty:
-                                initialsView
-                            @unknown default:
-                                initialsView
+                                if notificationCount <= 99 {
+                                    Text("\(notificationCount)")
+                                        .font(.system(size: 9, weight: .bold))
+                                        .foregroundColor(.white)
+                                } else {
+                                    Text("99+")
+                                        .font(.system(size: 7, weight: .bold))
+                                        .foregroundColor(.white)
+                                }
                             }
+                            .offset(x: 4, y: -4)
+                            .transition(.scale.combined(with: .opacity))
                         }
+                    }
+                    .animation(.spring(response: 0.3), value: notificationCount)
+                }
+                .buttonStyle(ScaleButtonStyle())
+
+                // Avatar button
+                Button(action: {
+                    HapticFeedback.impact(.light)
+                    onAvatarTap()
+                }) {
+                    if let avatarURL = avatarURL, !avatarURL.isEmpty {
+                        RemoteImage(urlString: avatarURL)
+                            .frame(width: 42, height: 42)
+                            .clipShape(Circle())
+                            .overlay(
+                                Circle()
+                                    .stroke(DesignSystem.Colors.primary.opacity(0.3), lineWidth: 2)
+                            )
                     } else {
                         initialsView
                     }
                 }
+                .buttonStyle(ScaleButtonStyle())
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(Color.white)
+        .padding(.horizontal, DesignSystem.Spacing.md)
+        .padding(.vertical, DesignSystem.Spacing.sm)
+        .background(
+            DesignSystem.Colors.surface
+                .shadow(color: .black.opacity(0.03), radius: 8, x: 0, y: 2)
+        )
     }
 }
 
-// MARK: - Home Stat Card (for Impact Snapshot)
+// MARK: - Small Icon Button
+struct IconButtonSmall: View {
+    let icon: String
+    var badge: Int? = nil
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: {
+            HapticFeedback.impact(.light)
+            action()
+        }) {
+            ZStack(alignment: .topTrailing) {
+                Image(systemName: icon)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(DesignSystem.Colors.textSecondary)
+                    .frame(width: 42, height: 42)
+                    .background(DesignSystem.Colors.surfaceSecondary)
+                    .clipShape(Circle())
+                    .overlay(
+                        Circle()
+                            .stroke(DesignSystem.Colors.border, lineWidth: 1)
+                    )
+
+                if let badge = badge, badge > 0 {
+                    Text(badge > 99 ? "99+" : "\(badge)")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 2)
+                        .background(DesignSystem.Colors.error)
+                        .clipShape(Capsule())
+                        .offset(x: 4, y: -4)
+                }
+            }
+        }
+        .buttonStyle(ScaleButtonStyle())
+    }
+}
+
+// MARK: - Home Stat Card (Enhanced with gradient and animation)
 struct HomeStatCard: View {
     let label: String
     let value: String
@@ -107,83 +174,140 @@ struct HomeStatCard: View {
     let icon: String
     let color: Color
 
+    @State private var isAnimated = false
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Image(systemName: icon)
-                    .font(.system(size: 14))
-                    .foregroundColor(color)
+                // Icon with soft background
+                ZStack {
+                    Circle()
+                        .fill(color.opacity(0.12))
+                        .frame(width: 36, height: 36)
+                    Image(systemName: icon)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(color)
+                }
+
                 Spacer()
+
                 if let delta = delta {
-                    HStack(spacing: 2) {
+                    HStack(spacing: 3) {
                         Image(systemName: delta >= 0 ? "arrow.up.right" : "arrow.down.right")
                             .font(.system(size: 10, weight: .bold))
                         Text(delta >= 0 ? "+\(delta)" : "\(delta)")
-                            .font(.system(size: 11, weight: .semibold))
+                            .font(DesignSystem.Typography.captionBold)
                     }
-                    .foregroundColor(delta >= 0 ? Color(hex: "10b981") : Color(hex: "ef4444"))
+                    .foregroundColor(delta >= 0 ? DesignSystem.Colors.success : DesignSystem.Colors.error)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule()
+                            .fill(delta >= 0 ? DesignSystem.Colors.successSoft : DesignSystem.Colors.errorSoft)
+                    )
                 }
             }
 
             Text(value)
-                .font(.system(size: 22, weight: .bold))
-                .foregroundColor(Color(hex: "1f2937"))
+                .font(DesignSystem.Typography.stat)
+                .foregroundColor(DesignSystem.Colors.textPrimary)
+                .scaleEffect(isAnimated ? 1.0 : 0.8)
+                .opacity(isAnimated ? 1.0 : 0)
 
             Text(label)
-                .font(.system(size: 12))
-                .foregroundColor(Color(hex: "6b7280"))
+                .font(DesignSystem.Typography.caption)
+                .foregroundColor(DesignSystem.Colors.textTertiary)
         }
-        .padding(12)
-        .background(Color.white)
-        .cornerRadius(12)
-        .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 2)
+        .padding(DesignSystem.Spacing.md)
+        .background(DesignSystem.Colors.surface)
+        .clipShape(RoundedRectangle(cornerRadius: DesignSystem.Radius.lg))
+        .overlay(
+            RoundedRectangle(cornerRadius: DesignSystem.Radius.lg)
+                .stroke(DesignSystem.Colors.border, lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.04), radius: 10, x: 0, y: 4)
+        .onAppear {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.1)) {
+                isAnimated = true
+            }
+        }
     }
 }
 
-// MARK: - Action Card (for Command Center)
+// MARK: - Action Card (Enhanced with press effect)
 struct ActionCard: View {
     let title: String
     let icon: String
     let color: Color
+    var subtitle: String? = nil
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
-            VStack(spacing: 12) {
+        Button(action: {
+            HapticFeedback.impact(.light)
+            action()
+        }) {
+            VStack(spacing: 10) {
+                // Icon with gradient glow
                 ZStack {
+                    // Glow
                     Circle()
-                        .fill(color.opacity(0.15))
+                        .fill(color.opacity(0.2))
+                        .frame(width: 54, height: 54)
+                        .blur(radius: 6)
+
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [color, color.opacity(0.8)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
                         .frame(width: 48, height: 48)
+
                     Image(systemName: icon)
-                        .font(.system(size: 20))
-                        .foregroundColor(color)
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundColor(.white)
                 }
 
-                Text(title)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(Color(hex: "1f2937"))
+                VStack(spacing: 2) {
+                    Text(title)
+                        .font(DesignSystem.Typography.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(DesignSystem.Colors.textPrimary)
+
+                    if let subtitle = subtitle {
+                        Text(subtitle)
+                            .font(DesignSystem.Typography.caption)
+                            .foregroundColor(DesignSystem.Colors.textTertiary)
+                    }
+                }
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 16)
-            .background(Color.white)
-            .cornerRadius(12)
-            .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 2)
+            .padding(.vertical, DesignSystem.Spacing.lg)
+            .background(DesignSystem.Colors.surface)
+            .clipShape(RoundedRectangle(cornerRadius: DesignSystem.Radius.lg))
+            .overlay(
+                RoundedRectangle(cornerRadius: DesignSystem.Radius.lg)
+                    .stroke(DesignSystem.Colors.border, lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.04), radius: 10, x: 0, y: 4)
         }
-        .buttonStyle(PlainButtonStyle())
+        .buttonStyle(ScaleButtonStyle())
     }
 }
 
-// MARK: - Genius Card (for Carousels)
+// MARK: - Genius Card (Enhanced for Carousels)
 struct GeniusCardSmall: View {
     let genius: TrendingGenius
     var onTap: () -> Void = {}
     var onFollow: () -> Void = {}
-    var onVote: () -> Void = {}
+    var onUpvote: () -> Void = {}
 
-    private var followManager: FollowManager { FollowManager.shared }
-    @State private var isPressed = false
-    @State private var followButtonScale: CGFloat = 1.0
-    @State private var voteButtonScale: CGFloat = 1.0
+    // Use stored constants instead of computed properties for proper @Observable tracking
+    private let followManager = FollowManager.shared
+    private let upvoteManager = UpvoteManager.shared
 
     private var isFollowing: Bool {
         followManager.isFollowing(genius.id)
@@ -193,194 +317,243 @@ struct GeniusCardSmall: View {
         followManager.isLoadingFollow(genius.id)
     }
 
+    private var hasUpvoted: Bool {
+        upvoteManager.hasUpvoted(genius.id)
+    }
+
+    private var isLoadingUpvote: Bool {
+        upvoteManager.isLoadingUpvote(genius.id)
+    }
+
+    /// Current vote count - use UpvoteManager's cached count if available, otherwise use genius.votes
+    private var currentVoteCount: Int {
+        upvoteManager.getVoteCount(genius.id) ?? genius.votes
+    }
+
     var body: some View {
-        VStack(spacing: 10) {
-            // Avatar with subtle hover effect
-            ZStack(alignment: .bottomTrailing) {
-                if let avatarURL = genius.avatarURL, !avatarURL.isEmpty {
-                    Image(avatarURL)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 60, height: 60)
-                        .clipShape(Circle())
-                } else {
-                    ZStack {
+        VStack(spacing: 12) {
+            // Tappable area for opening genius detail
+            Button(action: {
+                HapticFeedback.impact(.light)
+                onTap()
+            }) {
+                VStack(spacing: 12) {
+                    // Avatar with glow effect
+                    ZStack(alignment: .bottomTrailing) {
+                        // Outer glow
                         Circle()
-                            .fill(DesignSystem.Gradients.genius)
-                            .frame(width: 60, height: 60)
-                        Text(genius.initials)
-                            .font(.system(size: 18, weight: .bold))
-                            .foregroundColor(.white)
+                            .fill(DesignSystem.Colors.accent.opacity(0.15))
+                            .frame(width: 72, height: 72)
+
+                        if let avatarURL = genius.avatarURL, !avatarURL.isEmpty {
+                            RemoteImage(urlString: avatarURL)
+                                .frame(width: 64, height: 64)
+                                .clipShape(Circle())
+                                .overlay(
+                                    Circle()
+                                        .stroke(DesignSystem.Colors.accent.opacity(0.3), lineWidth: 2)
+                                )
+                        } else {
+                            ZStack {
+                                Circle()
+                                    .fill(DesignSystem.Gradients.genius)
+                                    .frame(width: 64, height: 64)
+                                Text(genius.initials)
+                                    .font(.system(size: 20, weight: .bold, design: .rounded))
+                                    .foregroundColor(.white)
+                            }
+                        }
+
+                        if genius.isVerified {
+                            Image(systemName: "checkmark.seal.fill")
+                                .font(.system(size: 18))
+                                .foregroundColor(DesignSystem.Colors.success)
+                                .background(
+                                    Circle()
+                                        .fill(.white)
+                                        .frame(width: 20, height: 20)
+                                )
+                                .offset(x: 2, y: 2)
+                        }
+                    }
+
+                    VStack(spacing: 4) {
+                        Text(genius.name)
+                            .font(DesignSystem.Typography.subheadline)
+                            .fontWeight(.semibold)
+                            .foregroundColor(DesignSystem.Colors.textPrimary)
+                            .lineLimit(1)
+
+                        Text(genius.positionTitle)
+                            .font(DesignSystem.Typography.caption)
+                            .foregroundColor(DesignSystem.Colors.textTertiary)
+                            .lineLimit(1)
+
+                        // Rank badge - use UpvoteManager's cached count if available
+                        HStack(spacing: 4) {
+                            Text("#\(genius.rank)")
+                                .font(DesignSystem.Typography.captionBold)
+                                .foregroundColor(DesignSystem.Colors.accent)
+
+                            Text("•")
+                                .foregroundColor(DesignSystem.Colors.textMuted)
+                                .font(.system(size: 8))
+
+                            Text("\(currentVoteCount.formatted()) upvotes")
+                                .font(DesignSystem.Typography.caption)
+                                .foregroundColor(DesignSystem.Colors.textTertiary)
+                        }
                     }
                 }
-
-                if genius.isVerified {
-                    Image(systemName: "checkmark.seal.fill")
-                        .font(.system(size: 16))
-                        .foregroundColor(Color(hex: "10b981"))
-                        .background(Circle().fill(.white).frame(width: 18, height: 18))
-                }
             }
-            .scaleEffect(isPressed ? 0.95 : 1.0)
-            .animation(FluidAnimation.snappy, value: isPressed)
+            .buttonStyle(PlainButtonStyle())
 
-            VStack(spacing: 2) {
-                Text(genius.name)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(Color(hex: "1f2937"))
-                    .lineLimit(1)
-
-                Text(genius.positionTitle)
-                    .font(.system(size: 11))
-                    .foregroundColor(Color(hex: "6b7280"))
-                    .lineLimit(1)
-
-                HStack(spacing: 4) {
-                    Text("#\(genius.rank)")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundColor(Color(hex: "f59e0b"))
-
-                    Text("•")
-                        .foregroundColor(Color(hex: "d1d5db"))
-
-                    Text("\(genius.votes.formatted()) votes")
-                        .font(.system(size: 11))
-                        .foregroundColor(Color(hex: "6b7280"))
-                }
-            }
-
+            // Action buttons - separate from the tap area above
             HStack(spacing: 6) {
                 Button(action: {
                     HapticFeedback.impact(.light)
-                    withAnimation(FluidAnimation.bouncy) {
-                        followButtonScale = 0.9
-                    }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        withAnimation(FluidAnimation.smooth) {
-                            followButtonScale = 1.0
-                        }
-                    }
                     onFollow()
                 }) {
                     if isLoadingFollow {
                         ProgressView()
                             .scaleEffect(0.7)
-                            .frame(width: 50, height: 24)
+                            .frame(height: 28)
                     } else {
                         Text(isFollowing ? "Following" : "Follow")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(isFollowing ? Color(hex: "10b981") : .white)
-                            .padding(.horizontal, 10)
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(isFollowing ? DesignSystem.Colors.primary : .white)
+                            .lineLimit(1)
+                            .padding(.horizontal, 8)
                             .padding(.vertical, 6)
-                            .background(isFollowing ? Color(hex: "10b981").opacity(0.15) : Color(hex: "10b981"))
-                            .cornerRadius(12)
+                            .background(
+                                Capsule()
+                                    .fill(isFollowing ? DesignSystem.Colors.primarySoft : DesignSystem.Colors.primary)
+                            )
                     }
                 }
-                .scaleEffect(followButtonScale)
+                .buttonStyle(PlainButtonStyle())
+                .scaleEffect(isLoadingFollow ? 1.0 : 1.0)
                 .disabled(isLoadingFollow)
 
                 Button(action: {
-                    HapticFeedback.impact(.medium)
-                    withAnimation(FluidAnimation.bouncy) {
-                        voteButtonScale = 0.9
+                    if !hasUpvoted && !isLoadingUpvote {
+                        HapticFeedback.impact(.medium)
+                        onUpvote()
                     }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        withAnimation(FluidAnimation.smooth) {
-                            voteButtonScale = 1.0
-                        }
-                    }
-                    onVote()
                 }) {
-                    Text("Vote")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(Color(hex: "f59e0b"))
-                        .padding(.horizontal, 12)
+                    if isLoadingUpvote {
+                        ProgressView()
+                            .scaleEffect(0.7)
+                            .frame(height: 28)
+                    } else {
+                        HStack(spacing: 4) {
+                            if hasUpvoted {
+                                Image(systemName: "checkmark")
+                                    .font(.system(size: 8, weight: .bold))
+                            }
+                            Text(hasUpvoted ? "Upvoted" : "Upvote")
+                                .font(.system(size: 10, weight: .semibold))
+                                .lineLimit(1)
+                        }
+                        .foregroundColor(hasUpvoted ? .white : DesignSystem.Colors.accent)
+                        .padding(.horizontal, hasUpvoted ? 8 : 12)
                         .padding(.vertical, 6)
-                        .background(Color(hex: "f59e0b").opacity(0.15))
-                        .cornerRadius(12)
+                        .background(
+                            Capsule()
+                                .fill(hasUpvoted ? Color.green.opacity(0.8) : DesignSystem.Colors.accentSoft)
+                        )
+                        .opacity(hasUpvoted ? 0.7 : 1.0)
+                    }
                 }
-                .scaleEffect(voteButtonScale)
+                .buttonStyle(PlainButtonStyle())
+                .disabled(hasUpvoted || isLoadingUpvote)
             }
         }
-        .padding(12)
-        .frame(width: 140)
-        .background(Color.white)
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(isPressed ? 0.08 : 0.05), radius: isPressed ? 6 : 10, x: 0, y: isPressed ? 2 : 4)
-        .scaleEffect(isPressed ? 0.97 : 1.0)
-        .animation(FluidAnimation.snappy, value: isPressed)
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { _ in
-                    if !isPressed {
-                        isPressed = true
-                        HapticFeedback.impact(.light)
-                    }
-                }
-                .onEnded { _ in
-                    isPressed = false
-                    onTap()
-                }
+        .padding(DesignSystem.Spacing.md)
+        .frame(width: 160)
+        .background(DesignSystem.Colors.surface)
+        .clipShape(RoundedRectangle(cornerRadius: DesignSystem.Radius.xl))
+        .overlay(
+            RoundedRectangle(cornerRadius: DesignSystem.Radius.xl)
+                .stroke(DesignSystem.Colors.border, lineWidth: 1)
         )
+        .shadow(color: .black.opacity(0.06), radius: 12, x: 0, y: 6)
     }
 }
 
-// MARK: - Alert Row
+// MARK: - Alert Row (Enhanced with priority indicators)
 struct AlertRow: View {
     let alert: AlertItem
     var onTap: () -> Void = {}
 
     var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 12) {
+        Button(action: {
+            HapticFeedback.impact(.light)
+            onTap()
+        }) {
+            HStack(spacing: 14) {
+                // Priority indicator with glow
                 ZStack {
                     Circle()
                         .fill(priorityColor.opacity(0.15))
-                        .frame(width: 36, height: 36)
+                        .frame(width: 40, height: 40)
+                    Circle()
+                        .fill(priorityColor.opacity(0.08))
+                        .frame(width: 46, height: 46)
+                        .blur(radius: 4)
                     Image(systemName: alert.icon)
-                        .font(.system(size: 14))
+                        .font(.system(size: 16, weight: .medium))
                         .foregroundColor(priorityColor)
                 }
 
-                Text(alert.message)
-                    .font(.system(size: 13))
-                    .foregroundColor(Color(hex: "374151"))
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(alert.message)
+                        .font(DesignSystem.Typography.subheadline)
+                        .foregroundColor(DesignSystem.Colors.textPrimary)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+
+                    Text(alert.actionLabel)
+                        .font(DesignSystem.Typography.captionBold)
+                        .foregroundColor(DesignSystem.Colors.primary)
+                }
 
                 Spacer()
 
-                Text(alert.actionLabel)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(Color(hex: "10b981"))
-
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 12))
-                    .foregroundColor(Color(hex: "9ca3af"))
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(DesignSystem.Colors.textMuted)
+                    .frame(width: 24, height: 24)
+                    .background(DesignSystem.Colors.surfaceSecondary)
+                    .clipShape(Circle())
             }
-            .padding(12)
-            .background(Color.white)
-            .cornerRadius(12)
+            .padding(DesignSystem.Spacing.md)
+            .background(DesignSystem.Colors.surface)
+            .clipShape(RoundedRectangle(cornerRadius: DesignSystem.Radius.lg))
+            .overlay(
+                RoundedRectangle(cornerRadius: DesignSystem.Radius.lg)
+                    .stroke(priorityColor.opacity(0.2), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.04), radius: 8, x: 0, y: 4)
         }
-        .buttonStyle(PlainButtonStyle())
+        .buttonStyle(ScaleButtonStyle())
     }
 
     private var priorityColor: Color {
         switch alert.priority {
-        case 1: return Color(hex: "ef4444")
-        case 2: return Color(hex: "f59e0b")
-        default: return Color(hex: "6b7280")
+        case 1: return DesignSystem.Colors.error
+        case 2: return DesignSystem.Colors.accent
+        default: return DesignSystem.Colors.textSecondary
         }
     }
 }
 
-// MARK: - Quick Action Pill
+// MARK: - Quick Action Pill (Enhanced with selection state)
 struct QuickActionPill: View {
     let title: String
     let icon: String?
     let isActive: Bool
     let action: () -> Void
-    @State private var isPressed = false
 
     var body: some View {
         Button(action: {
@@ -390,79 +563,89 @@ struct QuickActionPill: View {
             HStack(spacing: 6) {
                 if let icon = icon {
                     Image(systemName: icon)
-                        .font(.system(size: 12))
+                        .font(.system(size: 12, weight: .medium))
                 }
                 Text(title)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(DesignSystem.Typography.captionBold)
             }
-            .foregroundColor(isActive ? .white : Color(hex: "4b5563"))
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-            .background(isActive ? Color(hex: "10b981") : Color(hex: "f3f4f6"))
-            .cornerRadius(20)
-            .scaleEffect(isPressed ? 0.94 : 1.0)
-            .animation(FluidAnimation.snappy, value: isPressed)
-            .animation(FluidAnimation.smooth, value: isActive)
+            .foregroundColor(isActive ? .white : DesignSystem.Colors.textSecondary)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(
+                Capsule()
+                    .fill(isActive ? DesignSystem.Colors.primary : DesignSystem.Colors.surfaceSecondary)
+            )
+            .overlay(
+                Capsule()
+                    .stroke(isActive ? Color.clear : DesignSystem.Colors.border, lineWidth: 1)
+            )
+            .shadow(
+                color: isActive ? DesignSystem.Colors.primary.opacity(0.3) : .clear,
+                radius: isActive ? 6 : 0,
+                x: 0,
+                y: isActive ? 3 : 0
+            )
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isActive)
         }
-        .buttonStyle(PlainButtonStyle())
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { _ in isPressed = true }
-                .onEnded { _ in isPressed = false }
-        )
+        .buttonStyle(ScaleButtonStyle())
     }
 }
 
-// MARK: - Category Grid Item
+// MARK: - Category Grid Item (Enhanced with hover effect)
 struct CategoryGridItem: View {
     let category: CategoryItem
     let action: () -> Void
     @State private var isPressed = false
-    @State private var iconScale: CGFloat = 1.0
 
     var body: some View {
         Button(action: {
             HapticFeedback.impact(.light)
-            withAnimation(FluidAnimation.bouncy) {
-                iconScale = 1.2
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                withAnimation(FluidAnimation.smooth) {
-                    iconScale = 1.0
-                }
-            }
             action()
         }) {
-            VStack(spacing: 8) {
+            VStack(spacing: 10) {
+                // Icon with gradient background
                 ZStack {
+                    // Outer glow
                     Circle()
-                        .fill(Color(hex: category.color).opacity(isPressed ? 0.25 : 0.15))
-                        .frame(width: 44, height: 44)
-                        .animation(FluidAnimation.snappy, value: isPressed)
+                        .fill(Color(hex: category.color).opacity(0.1))
+                        .frame(width: 52, height: 52)
+                        .blur(radius: 4)
+
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color(hex: category.color),
+                                    Color(hex: category.color).opacity(0.8)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 48, height: 48)
+
                     Image(systemName: category.icon)
-                        .font(.system(size: 18))
-                        .foregroundColor(Color(hex: category.color))
-                        .scaleEffect(iconScale)
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundColor(.white)
                 }
 
                 Text(category.name)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(Color(hex: "374151"))
+                    .font(DesignSystem.Typography.caption)
+                    .fontWeight(.medium)
+                    .foregroundColor(DesignSystem.Colors.textPrimary)
+                    .lineLimit(1)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
-            .background(Color.white)
-            .cornerRadius(12)
-            .shadow(color: .black.opacity(isPressed ? 0.06 : 0.03), radius: isPressed ? 2 : 4, x: 0, y: isPressed ? 1 : 2)
-            .scaleEffect(isPressed ? 0.95 : 1.0)
-            .animation(FluidAnimation.snappy, value: isPressed)
+            .padding(.vertical, DesignSystem.Spacing.md)
+            .background(DesignSystem.Colors.surface)
+            .clipShape(RoundedRectangle(cornerRadius: DesignSystem.Radius.lg))
+            .overlay(
+                RoundedRectangle(cornerRadius: DesignSystem.Radius.lg)
+                    .stroke(DesignSystem.Colors.border, lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.04), radius: 8, x: 0, y: 4)
         }
-        .buttonStyle(PlainButtonStyle())
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { _ in isPressed = true }
-                .onEnded { _ in isPressed = false }
-        )
+        .buttonStyle(ScaleButtonStyle())
     }
 }
 

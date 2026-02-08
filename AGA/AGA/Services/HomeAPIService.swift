@@ -62,6 +62,7 @@ class HomeAPIService {
     // MARK: - Genius Home Data
     func getHomeGenius(userId: String) async throws -> GeniusHomeData {
         guard !userId.isEmpty else {
+            print("🔍 [HomeAPIService] userId is empty, returning default data with zeros")
             return getDefaultGeniusHomeData(userId: userId)
         }
 
@@ -69,12 +70,20 @@ class HomeAPIService {
             throw APIError.invalidURL
         }
 
+        print("🔍 [HomeAPIService] Fetching stats from: \(url.absoluteString)")
+
         do {
             let (data, response) = try await URLSession.shared.data(from: url)
 
             guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
                 // Return default data if user not found
+                print("🔍 [HomeAPIService] API returned non-200 status, returning default data")
                 return getDefaultGeniusHomeData(userId: userId)
+            }
+
+            // Debug: Print raw response
+            if let jsonString = String(data: data, encoding: .utf8) {
+                print("🔍 [HomeAPIService] Raw API response: \(jsonString.prefix(500))...")
             }
 
             let result = try JSONDecoder().decode(StatsAPIResponse.self, from: data)
@@ -139,8 +148,8 @@ class HomeAPIService {
         // Alert if gaining votes
         if profile.stats24h.votesDelta > 0 {
             alerts.append(AlertItem(
-                icon: "arrow.up.circle.fill",
-                message: "You gained \(profile.stats24h.votesDelta) votes in the last 24h!",
+                icon: "flame.fill",
+                message: "Your post is trending in your region!",
                 actionLabel: "View",
                 destination: "analytics",
                 priority: 1
@@ -169,25 +178,25 @@ class HomeAPIService {
             ))
         }
 
-        // Verification reminder
+        // Verification reminder - navigate to verification page
         if profile.verifiedStatus == .unverified {
             alerts.append(AlertItem(
                 icon: "checkmark.seal.fill",
                 message: "Get verified to increase your visibility",
                 actionLabel: "Verify",
-                destination: "settings",
+                destination: "verification",
                 priority: 2
             ))
         }
 
-        // Profile views alert
-        if profile.stats24h.profileViewsDelta > 10 {
+        // Add election/voting reminder alert (only if user has been active)
+        if profile.votesTotal > 0 {
             alerts.append(AlertItem(
-                icon: "eye.fill",
-                message: "\(profile.stats24h.profileViewsDelta) people viewed your profile",
-                actionLabel: "View",
-                destination: "analytics",
-                priority: 2
+                icon: "calendar.badge.clock",
+                message: "Voting ends in 3 days for your position",
+                actionLabel: "Campaign",
+                destination: "campaign",
+                priority: 1
             ))
         }
 
@@ -308,8 +317,22 @@ class HomeAPIService {
     }
 
     // MARK: - Feed Posts
-    func getFeedPosts(userId: String, role: UserRole) async throws -> [FeedPost] {
-        guard let url = URL(string: "\(baseURL)/posts") else {
+    func getFeedPosts(userId: String, role: UserRole, feedType: String? = nil) async throws -> [FeedPost] {
+        var urlString = "\(baseURL)/posts"
+
+        // Add query parameters for filtering
+        var queryItems: [String] = []
+        if !userId.isEmpty {
+            queryItems.append("userId=\(userId)")
+        }
+        if let feedType = feedType, !feedType.isEmpty {
+            queryItems.append("feedType=\(feedType)")
+        }
+        if !queryItems.isEmpty {
+            urlString += "?" + queryItems.joined(separator: "&")
+        }
+
+        guard let url = URL(string: urlString) else {
             throw APIError.invalidURL
         }
 
@@ -330,6 +353,7 @@ class HomeAPIService {
                     let authorName: String
                     let authorAvatar: String?
                     let authorPosition: String?
+                    let authorCountry: String?
                     let content: String
                     let mediaURLs: [String]?
                     let mediaType: String?
@@ -374,6 +398,7 @@ class HomeAPIService {
                         authorName: post.authorName,
                         authorAvatar: post.authorAvatar,
                         authorPosition: post.authorPosition ?? "",
+                        authorCountry: post.authorCountry ?? "",
                         content: post.content,
                         imageURL: imageURL,
                         postType: postType,
@@ -395,11 +420,6 @@ class HomeAPIService {
                     return a.createdAt > b.createdAt
                 }
 
-                // If no official posts exist, add the welcome post at the top
-                if !feedPosts.contains(where: { $0.isOfficialPost }) {
-                    feedPosts.insert(FeedPost.agaWelcomePost, at: 0)
-                }
-
                 return feedPosts
             } else {
                 return getMockFeedPosts()
@@ -411,7 +431,7 @@ class HomeAPIService {
     }
 
     // MARK: - Create Post
-    func createPost(payload: CreatePostPayload, userId: String, userName: String, userPosition: String) async throws -> Bool {
+    func createPost(payload: CreatePostPayload, userId: String, userName: String, userPosition: String, userCountry: String = "") async throws -> Bool {
         guard let url = URL(string: "\(baseURL)/posts") else {
             throw APIError.invalidURL
         }
@@ -432,6 +452,7 @@ class HomeAPIService {
             "authorId": userId,
             "authorName": userName,
             "authorPosition": userPosition,
+            "authorCountry": userCountry,
             "content": payload.content,
             "postType": postTypeString
         ]
@@ -529,7 +550,11 @@ class HomeAPIService {
         return result.data?.following ?? []
     }
 
-    func vote(giverUserId: String, geniusId: String, positionId: String) async throws -> Bool {
+    /// Upvote a genius to increase their ranking/popularity
+    /// This is for general support, not election voting
+    /// Returns the new vote count on success, or nil on failure
+    /// Upvote a genius. Returns the new vote count on success, or throws an error with description on failure.
+    func upvoteGenius(giverUserId: String, geniusId: String, positionId: String) async throws -> Int? {
         guard let url = URL(string: "\(baseURL)/users/\(geniusId)/vote") else {
             throw APIError.invalidURL
         }
@@ -541,16 +566,31 @@ class HomeAPIService {
 
         let (data, response) = try await URLSession.shared.data(for: request)
 
-        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+        struct UpvoteResponse: Codable {
+            let success: Bool
+            let data: UpvoteData?
+            let error: String?
+        }
+
+        struct UpvoteData: Codable {
+            let votesReceived: Int?
+            let votesCast: Int?
+            let message: String?
+        }
+
+        let result = try JSONDecoder().decode(UpvoteResponse.self, from: data)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
             throw APIError.serverError
         }
 
-        struct VoteResponse: Codable {
-            let success: Bool
+        // Handle error responses from the server
+        if httpResponse.statusCode != 200 || !result.success {
+            let errorMessage = result.error ?? "Failed to upvote"
+            throw APIError.custom(errorMessage)
         }
 
-        let result = try JSONDecoder().decode(VoteResponse.self, from: data)
-        return result.success
+        return result.data?.votesReceived
     }
 
     func donate(giverUserId: String, geniusId: String, amount: Double, method: String) async throws -> Bool {
@@ -600,13 +640,8 @@ class HomeAPIService {
     }
 
     private func getMockFeedPosts() -> [FeedPost] {
-        return [
-            // Official AGA post first
-            FeedPost.agaWelcomePost,
-            FeedPost(id: "1", authorId: "1", authorName: "Amina Mensah", authorAvatar: "profile_amina", authorPosition: "Minister of Education", content: "Education is the key to Africa's future. Today I visited 3 rural schools and saw the incredible potential of our youth. We must invest in digital literacy now! 📚💡", imageURL: nil, postType: .text, likesCount: 234, commentsCount: 45, sharesCount: 12, createdAt: Date().addingTimeInterval(-3600), isLiked: false, isFollowing: true, isAdminPost: false, isFeatured: false),
-            FeedPost(id: "2", authorId: "2", authorName: "Nkosi Dlamini", authorAvatar: "profile_nkosi", authorPosition: "Minister of Digital Economy", content: "Announcing our new fiber optic initiative that will connect 50 rural communities by 2025. This is just the beginning! 🌍🔌", imageURL: "sample_electricity", postType: .image, likesCount: 567, commentsCount: 89, sharesCount: 34, createdAt: Date().addingTimeInterval(-7200), isLiked: true, isFollowing: true, isAdminPost: false, isFeatured: false),
-            FeedPost(id: "3", authorId: "3", authorName: "Leila Ben Ali", authorAvatar: "profile_leila", authorPosition: "Minister of Transport", content: "The Pan-African rail network isn't just about trains—it's about connecting our people, our markets, and our dreams. 🚂🌍", imageURL: nil, postType: .text, likesCount: 189, commentsCount: 23, sharesCount: 8, createdAt: Date().addingTimeInterval(-14400), isLiked: false, isFollowing: false, isAdminPost: false, isFeatured: false)
-        ]
+        // Return empty array - no mock data, real API data only
+        return []
     }
 }
 
@@ -650,6 +685,7 @@ struct FeedPost: Identifiable {
     var authorName: String
     var authorAvatar: String?
     var authorPosition: String
+    var authorCountry: String
     var content: String
     var imageURL: String?
     var postType: PostType
@@ -674,26 +710,15 @@ struct FeedPost: Identifiable {
         isAdminPost || authorName == "AGA Official" || authorPosition.contains("Africa Genius Alliance")
     }
 
-    /// Static AGA Welcome post to show first
-    static var agaWelcomePost: FeedPost {
-        FeedPost(
-            id: "aga-official-welcome",
-            authorId: "aga-official",
-            authorName: "AGA Official",
-            authorAvatar: nil,
-            authorPosition: "Africa Genius Alliance",
-            content: "🌍 Welcome to Africa Genius Alliance! Together, we are building a platform where merit drives leadership. Every vote counts, every voice matters. Join us in shaping Africa's future!\n\n—\nThis communication is issued by Africa Genius Alliance. Official statements represent the collective voice of our platform and community.",
-            imageURL: nil,
-            postType: .text,
-            likesCount: 892,
-            commentsCount: 156,
-            sharesCount: 78,
-            createdAt: Date(),
-            isLiked: false,
-            isFollowing: true,
-            isAdminPost: true,
-            isFeatured: true
-        )
+    /// Display string combining position and country
+    var positionAndLocation: String {
+        if authorCountry.isEmpty {
+            return authorPosition
+        } else if authorPosition.isEmpty {
+            return authorCountry
+        } else {
+            return "\(authorPosition) • \(authorCountry)"
+        }
     }
 }
 

@@ -158,6 +158,9 @@ struct SupporterHomeScreen: View {
                                 categoriesSection(categories: categories)
                             }
 
+                            // Volunteer CTA Card
+                            volunteerCTASection
+
                             // Feed Filter Pills
                             feedFilterSection
                         }
@@ -279,6 +282,9 @@ struct SupporterHomeScreen: View {
         } message: {
             Text("Your upvote for \(upvotedGeniusName) has been recorded. Thank you for supporting!")
         }
+        .onReceive(NotificationCenter.default.publisher(for: .unreadCountDidChange)) { _ in
+            Task { await loadUnreadCount() }
+        }
     }
 
     // MARK: - Helper Functions
@@ -366,6 +372,57 @@ struct SupporterHomeScreen: View {
                 }
             }
         }
+    }
+
+    // MARK: - Volunteer CTA Section
+    private var volunteerCTASection: some View {
+        Button(action: {
+            HapticFeedback.impact(.medium)
+            if let url = URL(string: "https://africageniusalliance.com/volunteer") {
+                UIApplication.shared.open(url)
+            }
+        }) {
+            HStack(spacing: 16) {
+                ZStack {
+                    Circle()
+                        .fill(LinearGradient(
+                            colors: [Color(hex: "f97316"), Color(hex: "ea580c")],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ))
+                        .frame(width: 50, height: 50)
+                    Image(systemName: "heart.fill")
+                        .font(.system(size: 22))
+                        .foregroundColor(.white)
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Volunteer With Us")
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundColor(Color(hex: "1f2937"))
+                    Text("Join our mission to build Africa's future")
+                        .font(.system(size: 13))
+                        .foregroundColor(Color(hex: "6b7280"))
+                }
+
+                Spacer()
+
+                Image(systemName: "arrow.right.circle.fill")
+                    .font(.system(size: 28))
+                    .foregroundColor(Color(hex: "f97316"))
+            }
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(.white)
+                    .shadow(color: Color(hex: "f97316").opacity(0.15), radius: 8, x: 0, y: 4)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(Color(hex: "f97316").opacity(0.3), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Feed Filter Section
@@ -458,9 +515,20 @@ struct SupporterHomeScreen: View {
 
     private func refreshFeedOnly() async {
         // Silent refresh - don't show loading indicator
+        // IMPORTANT: respect the current filter.
+        // Otherwise polling will overwrite the "Following" feed with the default feed.
         do {
             let userId = authViewModel.currentUser?.id ?? ""
-            let updatedPosts = try await HomeAPIService.shared.getFeedPosts(userId: userId, role: .supporter)
+
+            let updatedPosts: [FeedPost]
+            switch selectedFilter {
+            case "Following":
+                updatedPosts = try await HomeAPIService.shared.getFeedPosts(userId: userId, role: .supporter, feedType: "following")
+            case "For You", "Trending", "Live":
+                updatedPosts = try await HomeAPIService.shared.getFeedPosts(userId: userId, role: .supporter)
+            default:
+                updatedPosts = try await HomeAPIService.shared.getFeedPosts(userId: userId, role: .supporter)
+            }
 
             // Update posts while preserving local state (like status from UI)
             await MainActor.run {

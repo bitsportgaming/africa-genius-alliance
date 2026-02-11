@@ -184,17 +184,10 @@ struct AnalyticsSheet: View {
 
     private func loadAnalytics() async {
         isLoading = true
-        try? await Task.sleep(nanoseconds: 300_000_000)
+        try? await Task.sleep(nanoseconds: 200_000_000)
 
-        // Get real user data with consistent vote count from UpvoteManager
-        let user = authService.currentUser
-        let totalVotes = upvoteManager.getVoteCount(user?.id ?? "") ?? user?.votesReceived ?? 0
-        let totalFollowers = user?.followersCount ?? 0
-
-        // Calculate period-specific data based on real totals
-        // For new accounts, these will all be 0
-        switch selectedPeriod {
-        case "24 Hours":
+        let userId = authService.currentUser?.id ?? ""
+        if userId.isEmpty {
             analyticsData = AnalyticsData(
                 totalViews: 0, viewsChange: 0,
                 newFollowers: 0, followersChange: 0,
@@ -204,48 +197,90 @@ struct AnalyticsSheet: View {
                 dailyVotes: [0],
                 topPosts: []
             )
-        case "7 Days":
-            analyticsData = AnalyticsData(
-                totalViews: 0, viewsChange: 0,
-                newFollowers: 0, followersChange: 0,
-                votesReceived: 0, votesChange: 0,
-                donations: 0, donationsChange: 0,
-                impressions: 0, profileVisits: 0, linkClicks: 0, shares: 0,
-                dailyVotes: [0, 0, 0, 0, 0, 0, 0],
-                topPosts: []
-            )
-        case "30 Days":
-            analyticsData = AnalyticsData(
-                totalViews: 0, viewsChange: 0,
-                newFollowers: 0, followersChange: 0,
-                votesReceived: 0, votesChange: 0,
-                donations: 0, donationsChange: 0,
-                impressions: 0, profileVisits: 0, linkClicks: 0, shares: 0,
-                dailyVotes: Array(repeating: 0, count: 30),
-                topPosts: []
-            )
-        case "All Time":
-            // All Time shows actual totals from user profile
+            isLoading = false
+            return
+        }
+
+        do {
+            // Source of truth: same stats endpoint used by Impact
+            let home = try await HomeAPIService.shared.getHomeGenius(userId: userId)
+            let p = home.profile
+
+            // Keep votes consistent with UpvoteManager if available
+            let votesTotal = upvoteManager.getVoteCount(userId) ?? p.votesTotal
+
+            let votes24h = p.stats24h.votesDelta
+            let followers24h = p.stats24h.followersDelta
+            let views24h = p.stats24h.profileViewsDelta
+
+            let multiplier: Int
+            let dailyVotesCount: Int
+            switch selectedPeriod {
+            case "24 Hours":
+                multiplier = 1
+                dailyVotesCount = 1
+            case "7 Days":
+                multiplier = 7
+                dailyVotesCount = 7
+            case "30 Days":
+                multiplier = 30
+                dailyVotesCount = 30
+            case "All Time":
+                multiplier = 0
+                dailyVotesCount = max(1, min(votesTotal, 30))
+            default:
+                multiplier = 7
+                dailyVotesCount = 7
+            }
+
+            if selectedPeriod == "All Time" {
+                analyticsData = AnalyticsData(
+                    totalViews: max(0, views24h) * 30, viewsChange: 0, // no total views field yet
+                    newFollowers: p.followersTotal, followersChange: 0,
+                    votesReceived: votesTotal, votesChange: 0,
+                    donations: 0, donationsChange: 0,
+                    impressions: 0,
+                    profileVisits: max(0, views24h) * 30,
+                    linkClicks: 0,
+                    shares: 0,
+                    dailyVotes: Array(repeating: 0, count: dailyVotesCount),
+                    topPosts: []
+                )
+            } else {
+                let votesPeriod = votes24h * multiplier
+                let followersPeriod = followers24h * multiplier
+                let viewsPeriod = views24h * multiplier
+
+                analyticsData = AnalyticsData(
+                    totalViews: max(0, viewsPeriod), viewsChange: 0,
+                    newFollowers: max(0, followersPeriod), followersChange: followers24h,
+                    votesReceived: max(0, votesPeriod), votesChange: votes24h,
+                    donations: 0, donationsChange: 0,
+                    impressions: 0,
+                    profileVisits: max(0, viewsPeriod),
+                    linkClicks: 0,
+                    shares: 0,
+                    dailyVotes: Array(repeating: 0, count: dailyVotesCount),
+                    topPosts: []
+                )
+            }
+        } catch {
+            print("Error loading analytics: \(error)")
+            // Fallback (old behavior)
+            let user = authService.currentUser
+            let totalVotes = upvoteManager.getVoteCount(user?.id ?? "") ?? user?.votesReceived ?? 0
+            let totalFollowers = user?.followersCount ?? 0
             analyticsData = AnalyticsData(
                 totalViews: 0, viewsChange: 0,
                 newFollowers: totalFollowers, followersChange: 0,
                 votesReceived: totalVotes, votesChange: 0,
                 donations: 0, donationsChange: 0,
                 impressions: 0, profileVisits: 0, linkClicks: 0, shares: 0,
-                dailyVotes: totalVotes > 0 ? [totalVotes] : [0],
-                topPosts: []
-            )
-        default:
-            analyticsData = AnalyticsData(
-                totalViews: 0, viewsChange: 0,
-                newFollowers: 0, followersChange: 0,
-                votesReceived: 0, votesChange: 0,
-                donations: 0, donationsChange: 0,
-                impressions: 0, profileVisits: 0, linkClicks: 0, shares: 0,
-                dailyVotes: [0, 0, 0, 0, 0, 0, 0],
+                dailyVotes: [0],
                 topPosts: []
             )
         }
+
         isLoading = false
     }
 }
@@ -1268,12 +1303,12 @@ struct GeniusSettingsSheet: View {
     @Environment(AuthService.self) private var authService
     let userId: String
 
-    @State private var notificationsEnabled = true
-    @State private var emailNotifications = true
-    @State private var pushNotifications = true
-    @State private var publicProfile = true
-    @State private var showDonationButton = true
-    @State private var allowMessages = true
+    @StateObject private var settings: UserSettingsStore
+
+    init(userId: String) {
+        self.userId = userId
+        _settings = StateObject(wrappedValue: UserSettingsStore(userId: userId))
+    }
 
     var body: some View {
         NavigationView {
@@ -1281,6 +1316,7 @@ struct GeniusSettingsSheet: View {
                 notificationsSection
                 privacySection
                 profileSection
+                volunteerSection
                 accountSection
             }
             .navigationTitle("Settings")
@@ -1293,28 +1329,75 @@ struct GeniusSettingsSheet: View {
         }
     }
 
+    private var volunteerSection: some View {
+        Section {
+            Button(action: {
+                HapticFeedback.impact(.medium)
+                if let url = URL(string: "https://africageniusalliance.com/volunteer") {
+                    UIApplication.shared.open(url)
+                }
+            }) {
+                HStack(spacing: 12) {
+                    ZStack {
+                        Circle()
+                            .fill(Color(hex: "f97316").opacity(0.15))
+                            .frame(width: 36, height: 36)
+                        Image(systemName: "heart.fill")
+                            .font(.system(size: 16))
+                            .foregroundColor(Color(hex: "f97316"))
+                    }
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Volunteer With Us")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(Color(hex: "1f2937"))
+                        Text("Join our mission to build Africa's future")
+                            .font(.system(size: 12))
+                            .foregroundColor(Color(hex: "6b7280"))
+                    }
+
+                    Spacer()
+
+                    Image(systemName: "arrow.up.right")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(Color(hex: "f97316"))
+                }
+            }
+        } header: {
+            Text("Get Involved")
+        } footer: {
+            Text("Help shape the future of Africa by volunteering your time and skills.")
+        }
+    }
+
     private var notificationsSection: some View {
         Section("Notifications") {
-            Toggle(isOn: $notificationsEnabled) {
+            Toggle(isOn: $settings.notificationsEnabled) {
                 Label("Enable Notifications", systemImage: "bell.fill")
             }
-            if notificationsEnabled {
-                Toggle(isOn: $emailNotifications) {
-                    Label("Email Notifications", systemImage: "envelope.fill")
-                }
-                Toggle(isOn: $pushNotifications) {
-                    Label("Push Notifications", systemImage: "iphone")
-                }
+            .onChange(of: settings.notificationsEnabled) { _, _ in
+                // Ensure dependent toggles sync immediately.
+                settings.enforceDependencies()
             }
+
+            Toggle(isOn: $settings.emailNotifications) {
+                Label("Email Notifications", systemImage: "envelope.fill")
+            }
+            .disabled(!settings.notificationsEnabled)
+
+            Toggle(isOn: $settings.pushNotifications) {
+                Label("Push Notifications", systemImage: "iphone")
+            }
+            .disabled(!settings.notificationsEnabled)
         }
     }
 
     private var privacySection: some View {
         Section("Privacy") {
-            Toggle(isOn: $publicProfile) {
+            Toggle(isOn: $settings.publicProfile) {
                 Label("Public Profile", systemImage: "eye.fill")
             }
-            Toggle(isOn: $allowMessages) {
+            Toggle(isOn: $settings.allowMessages) {
                 Label("Allow Messages", systemImage: "message.fill")
             }
         }
@@ -1322,7 +1405,7 @@ struct GeniusSettingsSheet: View {
 
     private var profileSection: some View {
         Section("Profile Settings") {
-            Toggle(isOn: $showDonationButton) {
+            Toggle(isOn: $settings.showDonationButton) {
                 Label("Show Donation Button", systemImage: "dollarsign.circle.fill")
             }
             NavigationLink {

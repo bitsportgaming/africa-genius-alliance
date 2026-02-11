@@ -4,7 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { AGAButton } from '@/components/ui';
-import { ArrowRight, Sparkles } from 'lucide-react';
+import { ArrowRight, Sparkles, Heart } from 'lucide-react';
 
 export const HeroSection: React.FC = () => {
   return (
@@ -69,6 +69,16 @@ export const HeroSection: React.FC = () => {
                 className="min-w-[200px] !border-white !text-white hover:!bg-white hover:!text-primary"
               >
                 Explore Geniuses
+              </AGAButton>
+            </Link>
+            <Link href="/volunteer">
+              <AGAButton
+                variant="outline"
+                size="lg"
+                leftIcon={<Heart className="w-5 h-5" />}
+                className="min-w-[200px] !border-secondary !text-secondary hover:!bg-secondary hover:!text-white"
+              >
+                Volunteer
               </AGAButton>
             </Link>
           </div>

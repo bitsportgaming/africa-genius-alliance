@@ -15,7 +15,8 @@ import {
   Menu,
   X,
   LogOut,
-  Settings
+  Settings,
+  Heart
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -197,6 +198,14 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                         <Settings className="w-4 h-4 text-gray-600" />
                         <span className="text-sm text-text-dark">Settings</span>
                       </Link>
+                      <Link
+                        href="/volunteer"
+                        className="flex items-center gap-3 px-4 py-2 hover:bg-orange-50 transition-colors"
+                        onClick={() => setProfileMenuOpen(false)}
+                      >
+                        <Heart className="w-4 h-4 text-orange-500" />
+                        <span className="text-sm text-orange-600 font-medium">Volunteer</span>
+                      </Link>
                       <hr className="my-2 border-gray-200" />
                       <button
                         onClick={handleLogout}
@@ -248,6 +257,14 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                   </Link>
                 );
               })}
+              <Link
+                href="/volunteer"
+                className="flex items-center gap-3 px-4 py-3 rounded-lg font-medium text-orange-600 hover:bg-orange-50 transition-all"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <Heart className="w-5 h-5" />
+                <span>Volunteer</span>
+              </Link>
               <hr className="my-2 border-gray-200" />
               <button
                 onClick={handleLogout}
